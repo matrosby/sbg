@@ -2,8 +2,8 @@
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
 // @version      1.10.1m
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.js
+// @downloadURL  https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
+// @updateURL    https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://3d.sytes.net/*
