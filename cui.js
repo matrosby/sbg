@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.10.1
+// @version      1.10.1m
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.1';
+	const USERSCRIPT_VERSION = '1.10.1m';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
