@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.10.1m
-// @downloadURL  https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
-// @updateURL    https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
+// @version      1.103
+// @downloadURL  https://matros.by/sbg/cui.js
+// @updateURL    https://matros.by/sbg/cui.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://3d.sytes.net/*
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.1m';
+	const USERSCRIPT_VERSION = '1.103';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2126,7 +2126,7 @@
 			let zoomContainer = document.querySelector('.ol-zoom');
 			let pointEnergy = document.createElement('div');
 			let pointEnergyLabel = document.createElement('span');
-			let pointOwner = document.querySelector('.i-stat__entry:has(#i-stat__owner)');
+			let pointOwner = document.querySelector('#i-stat__owner').parentElement;
 
 			document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 			document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -2207,7 +2207,7 @@
 
 			stadiaLabel.append(stadiaInput, stadiaSpan);
 
-			document.querySelector('.layers-config__entry:has(input[value="osm"])').after(stadiaLabel);
+			document.querySelector('input[value="osm"]').parentElement.after(stadiaLabel);
 		}
 
 
@@ -2591,7 +2591,7 @@
 
 					if (clicks + 1 == 5) {
 						let iStat = document.querySelector('.i-stat');
-						let guid = document.querySelector('.info.popup').dataset.guid;
+						let guid = pointPopup.dataset.guid;
 						let guidSpan = document.createElement('span');
 
 						guidSpan.innerText = `GUID: ${guid}`;
@@ -2603,7 +2603,7 @@
 							});
 						});
 
-						iStat.prepend(guidSpan);
+						pointPopup.insertBefore(guidSpan, iStat);
 
 						pointPopup.addEventListener('pointPopupClosed', _ => {
 							guidSpan.remove();
