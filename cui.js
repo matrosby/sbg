@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.103
+// @version      1.104
 // @downloadURL  https://matros.by/sbg/cui.js
 // @updateURL    https://matros.by/sbg/cui.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.103';
+	const USERSCRIPT_VERSION = '1.104';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -134,7 +134,7 @@
 			}
 
 			forEachFeatureAtPixel(pixel, callback, options = {}) {
-				const isShowInfoCallback = callback.toString().includes('showInfo(');
+				const isShowInfoCallback = callback.toString().includes('piv.push');
 
 				options.hitTolerance = isFinite(options.hitTolerance) ? options.hitTolerance : HIT_TOLERANCE;
 
@@ -1927,8 +1927,8 @@
 			[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
 			styles.setAttribute('href', `https://matros.by/sbg/styles.min.css`);
-			fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
-			faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
+			fa.setAttribute('href', `https://matros.by/sbg/fa.min.css`);
+			faSvg.setAttribute('href', `https://matros.by/sbg/fa-svg.min.css`);
 
 			document.head.append(cssVars, fa, faSvg, styles);
 		}
