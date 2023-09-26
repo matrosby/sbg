@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.104
+// @version      1.103
 // @downloadURL  https://matros.by/sbg/cui.js
 // @updateURL    https://matros.by/sbg/cui.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.104';
+	const USERSCRIPT_VERSION = '1.103';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -134,7 +134,7 @@
 			}
 
 			forEachFeatureAtPixel(pixel, callback, options = {}) {
-				const isShowInfoCallback = callback.toString().includes('piv.push');
+				const isShowInfoCallback = callback.toString().includes('showInfo(');
 
 				options.hitTolerance = isFinite(options.hitTolerance) ? options.hitTolerance : HIT_TOLERANCE;
 
