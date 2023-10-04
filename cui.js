@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.10.7
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
+// @version      1.107
+// @downloadURL  https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
+// @updateURL    https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://sbg-game.ru/app/*
-// @exclude      https://sbg-game.ru/app/login/
+// @exclude      https://sbg-game.ru/login/
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.7';
+	const USERSCRIPT_VERSION = '1.107';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
