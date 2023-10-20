@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.23
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
+// @version      2.11.23
+// @downloadURL  https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
+// @updateURL    https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://sbg-game.ru/app/*
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.23';
+	const USERSCRIPT_VERSION = '2.11.23';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2044,7 +2044,7 @@
 
 			[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-			styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+			styles.setAttribute('href', `https://raw.githubusercontent.com/matrosby/sbg/master/styles.min.css`);
 			fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
 			faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
