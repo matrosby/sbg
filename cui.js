@@ -1,36 +1,38 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.107
-// @downloadURL  https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
-// @updateURL    https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
+// @version      1.11.20m
+// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
+// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://sbg-game.ru/app/*
-// @exclude      https://sbg-game.ru/login/
 // @run-at       document-idle
 // @grant        none
+// @iconURL    https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
 // ==/UserScript==
 
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.107';
-	const LATEST_KNOWN_VERSION = '0.4.2';
+	const USERSCRIPT_VERSION = '1.11.20m';
+	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
 	const DISCOVERY_COOLDOWN = 90;
 	const PLAYER_RANGE = 45;
 	const HIT_TOLERANCE = 15;
+	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
+	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const HIGHLEVEL_MARKER = 8;
 	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
 	const IS_CDB_MAP = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
 	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
-	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
+	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 4, 4: 4, 5: 3, 6: 3, 7: 2, 8: 2, 9: 1, 10: 1 };
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
 	const ITEMS_TYPES = {
 		1: { eng: 'cores', rus: 'ядра' },
@@ -101,7 +103,8 @@
 		},
 	};
 
-	let map, playerFeature;
+	let map, view, playerFeature;
+	let isFollow = localStorage.getItem('follow') == 'true';
 
 
 	if (window.location.pathname.startsWith('/login')) { return; }
@@ -177,29 +180,107 @@
 
 				super.setStyle(style);
 			}
+
+			get blastRange() {
+				return this == playerFeature ? this.getStyle()[3].getGeometry() : undefined;
+			}
+		}
+
+		class View extends ol.View {
+			constructor(options) {
+				options.padding = [VIEW_PADDING, 0, 0, 0];
+				super(options);
+				view = this;
+				window.view = view;
+			}
+
+			fitBlastRange(isCompleted) {
+				if (isCompleted) { this.set('blastRangeZoom', this.getZoom()); return; }
+
+				this.removePadding();
+				this.fit(playerFeature.blastRange, {
+					callback: this.fitBlastRange.bind(this),
+					duration: 0, // Временно отключено
+					maxZoom: 17,
+				});
+			}
+
+			setTopPadding() {
+				this.padding = [VIEW_PADDING, 0, 0, 0];
+			}
+
+			setBottomPadding() {
+				this.padding = [0, 0, VIEW_PADDING, 0];
+			}
+
+			removePadding() {
+				this.padding = [0, 0, 0, 0];
+			}
 		}
 
 		ol.Map = Map;
 		ol.Feature = Feature;
+		ol.View = View;
 	}
 
 	function loadMainScript() {
+		function replacer(match) {
+			switch (match) {
+				case `const Catalysers`:
+					return `window.Catalysers`;
+				case `const TeamColors`:
+					return `window.TeamColors`;
+				case `if (zoom % 1 != 0)`:
+					return `//if (zoom % 1 != 0)`;
+				case `const draw_slider`:
+					return `window.draw_slider`;
+				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`:
+					return `if ($('.attack-slider-wrp').hasClass('hidden')) {return;`;
+				case `$('[name="baselayer"]').on('change', e`:
+					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
+				case `function initCompass() {`:
+					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
+				case `testuser`:
+					return `NickolayV`;
+				case `makeEntry(e, data)`:
+					return `window.makeEntryDec(e, data, makeEntry)`;
+				case `view.calculateExtent(map.getSize()`:
+					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
+				case `z: view.getZoom()`:
+					return `z: Math.floor(view.getZoom())`;
+				case `const persist = [`:
+					return `const persist = [/^sbgcui_/, `;
+				case `if (type == 'osm') {`:
+					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
+				case `class Bitfield`:
+					return `window.requestEntities = requestEntities; window.Bitfield = class Bitfield`;
+				default:
+					return match;
+			}
+		}
+
+		const regexp = new RegExp([
+			`(const Catalysers)`,
+			`(const TeamColors)`,
+			`(if \\(zoom % 1 != 0\\))`,
+			`(const draw_slider)`,
+			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
+			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
+			`(function initCompass\\(\\) {)`,
+			`(testuser)`,
+			`(makeEntry\\(e, data\\)(?!\\s{))`,
+			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
+			`(z: view.getZoom\\(\\))`,
+			`(const persist = \\[)`,
+			`(if \\(type == 'osm'\\) {)`,
+			`(class Bitfield)`,
+		].join('|'), 'g');
+
 		fetch('/app/script.js')
 			.then(r => r.text())
 			.then(data => {
-				let script = document.createElement('script');
-
-				data = data.replace('const Catalysers = [', 'window.Catalysers = [');
-				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
-				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
-				data = data.replace('const draw_slider =', 'window.draw_slider =');
-				data = data.replace('class Bitfield', 'window.Bitfield = class Bitfield');
-				data = data.replace(`if (type == 'osm') {`, `if (type == 'stadia') { source=new ol.source.StadiaMaps({ layer:'stamen_watercolor' })} else if (type == 'osm') {`);
-				data = data.replace(`$('[name="baselayer"]').on('change', e`, `$('.layers-config__list').on('change', '[name="baselayer"]', e`);
-				data = data.replaceAll(/makeEntry\(e,\sdata\)(?!\s{)/g, 'window.makeEntryDec(e, data, makeEntry)');
-
-				script.textContent = data;
-
+				const script = document.createElement('script');
+				script.textContent = data.replace(regexp, replacer);
 				document.head.appendChild(script);
 			})
 			.catch(error => {
@@ -338,7 +419,7 @@
 						owner: core.o,
 					}
 				});
-				
+
 				const event = new Event('pointRepaired');
 				pointPopup.dispatchEvent(event);
 			}
@@ -370,17 +451,21 @@
 			#isExpanded = false;
 			#toolbar = document.createElement('div');
 
-			constructor() {
-				let container = document.createElement('div');
+			constructor(toolbarName) {
+				const container = document.createElement('div');
+				const isExpanded = localStorage.getItem(toolbarName) == 'true';
+
 				container.classList.add('ol-unselectable', 'ol-control', 'sbgcui_toolbar-control');
 				super({ element: container });
+
+				this.name = toolbarName;
 
 				this.#expandButton.classList.add('fa', 'fa-solid-angle-up');
 				this.#expandButton.addEventListener('click', this.handleExpand.bind(this));
 
 				this.#toolbar.classList.add('sbgcui_toolbar');
 
-				this.collapse();
+				isExpanded ? this.expand() : this.collapse();
 
 				container.append(this.#toolbar, this.#expandButton);
 			}
@@ -397,6 +482,7 @@
 				this.#toolbar.classList.add('sbgcui_hidden');
 
 				this.#isExpanded = false;
+				localStorage.setItem(this.name, false)
 			}
 
 			expand() {
@@ -406,6 +492,7 @@
 				this.#toolbar.classList.remove('sbgcui_hidden');
 
 				this.#isExpanded = true;
+				localStorage.setItem(this.name, true)
 			}
 
 			handleExpand() {
@@ -453,16 +540,16 @@
 				}
 			}
 
-			#remindAt(timestamp) {
-				function onTimeout() {
-					this.#notify();
-					this.cooldown = null;
-				}
+			#onTimeout() {
+				this.#notify();
+				this.cooldown = null;
+			}
 
+			#remindAt(timestamp) {
 				let delay = timestamp - Date.now();
 
 				clearTimeout(this.timeoutID);
-				this.timeoutID = setTimeout(onTimeout.bind(this), delay);
+				this.timeoutID = setTimeout(this.#onTimeout.bind(this), delay);
 			}
 
 			toJSON() {
@@ -550,11 +637,13 @@
 		let selfNameSpan = document.querySelector('#self-info__name');
 		let toggleFollow = document.querySelector('#toggle-follow');
 		let xpDiffSpan = document.querySelector('.xp-diff');
+		let zoomContainer = document.querySelector('.ol-zoom');
 
 		let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 		let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
+		let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 
 		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
 		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
@@ -569,8 +658,6 @@
 		let uniques = { c: new Set(), v: new Set() };
 		let inview = {};
 		let inviewRegionsVertexes = [];
-
-		let view = map.getView();
 
 		let percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
@@ -708,6 +795,7 @@
 								case '/api/inview':
 									const inviewPoints = parsedResponse.p;
 									const inviewRegions = parsedResponse.r;
+									const zoom = +url.searchParams.get('z');
 
 									const mapConfig = JSON.parse(localStorage.getItem('map-config'));
 									const lParam = url.searchParams.get('l');
@@ -731,7 +819,7 @@
 
 									if (!inviewPoints) { break; }
 
-									if (isHighlightCoresOrLevel) {
+									if (isHighlightCoresOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
 										let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
 
 										if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
@@ -821,8 +909,8 @@
 
 									break;
 								case '/api/profile':
-									if ('data' in parsedResponse) {
-										regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.data.created_at));
+									if ('name' in parsedResponse) {
+										regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.created_at));
 									}
 									break;
 								case '/api/repair':
@@ -866,7 +954,6 @@
 				method: "GET",
 			})
 				.then(r => r.json())
-				.then(r => r.data)
 				.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 		}
 
@@ -1005,6 +1092,19 @@
 				body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
 				method: 'POST',
 			}).then(r => r.json());
+		}
+
+		async function fetchHTMLasset(filename) {
+			return fetch(`${HOME_DIR}/assets/html/${filename}.html`)
+				.then(r => {
+					if (r.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${r.status})`); }
+					return r.text();
+				})
+				.then(html => {
+					const parser = new DOMParser();
+					const node = parser.parseFromString(html, 'text/html').body.firstChild;
+					return node;
+				});
 		}
 
 		function createResponse(obj, originalResponse) {
@@ -1661,7 +1761,7 @@
 			window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
 			window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
 
-			doubleClickZoomInteraction?.setActive(Boolean(ui.doubleClickZoom));
+			doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
 
 			if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -1982,7 +2082,7 @@
 
 				if (event) { records[0].target.dispatchEvent(event); }
 			});
-			pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ["class"] });
+			pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ['class'] });
 
 
 			let profilePopupObserver = new MutationObserver(records => {
@@ -1990,7 +2090,7 @@
 				let event = new Event(isProfilePopupOpened ? 'profilePopupOpened' : 'profilePopupClosed', { bubbles: true });
 				records[0].target.dispatchEvent(event);
 			});
-			profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ["class"] });
+			profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ['class'] });
 
 
 			let inventoryPopupObserver = new MutationObserver(records => {
@@ -1998,24 +2098,23 @@
 				let event = new Event(isInventoryPopupOpened ? 'inventoryPopupOpened' : 'inventoryPopupClosed');
 				records[0].target.dispatchEvent(event);
 			});
-			inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ["class"] });
+			inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ['class'] });
 
 
 			let attackSliderObserver = new MutationObserver(records => {
-				let isHidden = records[0].target.classList.contains('hidden');
-				let event = new Event(isHidden ? 'attackSliderClosed' : 'attackSliderOpened', { bubbles: true });
+				isAttackSliderOpened = !records[0].target.classList.contains('hidden');
+				let event = new Event(isAttackSliderOpened ? 'attackSliderOpened' : 'attackSliderClosed');
 				records[0].target.dispatchEvent(event);
-				isAttackSliderOpened = !isHidden;
 			});
-			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
+			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ['class'] });
 
 
 			let drawSliderObserver = new MutationObserver(records => {
-				let isHidden = records[0].target.classList.contains('hidden');
-				let event = new Event(isHidden ? 'drawSliderClosed' : 'drawSliderOpened', { bubbles: true });
+				isDrawSliderOpened = !records[0].target.classList.contains('hidden');
+				let event = new Event(isDrawSliderOpened ? 'drawSliderOpened' : 'drawSliderClosed');
 				records[0].target.dispatchEvent(event);
 			});
-			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ["class"] });
+			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ['class'] });
 
 
 			let xpDiffSpanObserver = new MutationObserver(records => {
@@ -2038,12 +2137,19 @@
 
 			let catalysersListObserver = new MutationObserver(records => {
 				if (!isAttackSliderOpened) { return; }
-				if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
+
+				const attributesRecords = [...records].filter(r => r.type == 'attributes');
+				const childListRecords = [...records].filter(r => r.type == 'childList');
+
+				const isActiveSwitched = attributesRecords.some(r => r.oldValue.includes('is-active') && !r.target.classList.contains('is-active'));
+				const isEverySlideAddedNow = childListRecords.length > 0 && childListRecords.every(r => r.addedNodes.length == 1 && r.removedNodes.length == 0);
+
+				if (isActiveSwitched || isEverySlideAddedNow) {
 					let event = new Event('activeSlideChanged');
 					catalysersList.dispatchEvent(event);
 				}
 			});
-			catalysersListObserver.observe(catalysersList, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+			catalysersListObserver.observe(catalysersList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 
 
 			let coresListObserver = new MutationObserver(records => {
@@ -2051,6 +2157,13 @@
 				coresList.dispatchEvent(event);
 			});
 			coresListObserver.observe(coresList, { childList: true });
+
+
+			let toggleFollowObserver = new MutationObserver(records => {
+				isFollow = toggleFollow.dataset.active == 'true';
+				dragPanInteraction.setActive(!isFollow);
+			});
+			toggleFollowObserver.observe(toggleFollow, { attributes: true, attributeFilter: ['data-active'] });
 		}
 
 
@@ -2077,6 +2190,10 @@
 				pointEnergyValue.innerText = `${lastOpenedPoint.energyFormatted}% @ ${lastOpenedPoint.coresAmount}`;
 			});
 
+			pointPopup.addEventListener('pointRepaired', () => {
+				pointEnergyValue.innerText = `${lastOpenedPoint.energyFormatted}% @ ${lastOpenedPoint.coresAmount}`;
+			});
+
 			document.addEventListener("backbutton", () => {
 				if (isProfilePopupOpened) {
 					click(pointPopupCloseButton);
@@ -2096,13 +2213,20 @@
 			});
 
 			toggleFollow.addEventListener('touchstart', () => {
-				let touchStartDate = Date.now();
+				function resetView(isCompleted) {
+					if (isCompleted) { return; }
 
-				let timeoutID = setTimeout(() => {
 					view.animate(
 						{ center: player.feature.getGeometry().getCoordinates() },
-						{ zoom: 17 });
-				}, 500);
+						{ zoom: 17 },
+						{ rotation: 0 },
+						resetView
+					);
+				}
+
+				let touchStartDate = Date.now();
+
+				let timeoutID = setTimeout(resetView, 500);
 
 				this.addEventListener('touchend', () => {
 					let touchDuration = Date.now() - touchStartDate;
@@ -2110,9 +2234,18 @@
 				}, { once: true });
 			});
 
-			toggleFollow.addEventListener('click', () => {
-				dragPanInteraction?.setActive(toggleFollow.dataset.active == 'false');
-			})
+			drawSlider.addEventListener('drawSliderOpened', () => {
+				view.setBottomPadding();
+				
+				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
+				// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
+				window.draw_slider.emit('active', { slide: drawSlider.querySelector('.splide__slide.is-active') });
+			});
+
+			drawSlider.addEventListener('drawSliderClosed', () => {
+				view.setTopPadding();
+				view.setCenter(playerFeature.getGeometry().getCoordinates());
+			});
 		}
 
 
@@ -2124,10 +2257,12 @@
 			let layersButton = document.querySelector('#layers');
 			let notifsButton = document.querySelector('#notifs-menu');
 			let attackSliderClose = document.querySelector('#attack-slider-close');
-			let zoomContainer = document.querySelector('.ol-zoom');
 			let pointEnergy = document.createElement('div');
 			let pointEnergyLabel = document.createElement('span');
 			let pointOwner = document.querySelector('#i-stat__owner').parentElement;
+			let highlevelCatalyserWarn = document.querySelector('.attack-slider-highlevel');
+
+			attackSlider.prepend(highlevelCatalyserWarn);
 
 			document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 			document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -2139,6 +2274,7 @@
 
 				toDelete.forEach(e => { e.remove(); });
 			});
+			document.querySelector('.i-stat__tools').remove();
 
 			attackSliderClose.remove(); // Кнопка закрытия слайдера не нужна.
 			attackButton.childNodes[0].remove(); // Надпись Attack.
@@ -2172,11 +2308,13 @@
 
 		/* Доработка карты */
 		{
-			var dragPanInteraction;
-			var doubleClickZoomInteraction;
-			var toolbar = new Toolbar();
+			let attributionControl, rotateControl;
+			var dragPanInteraction, doubleClickZoomInteraction, pinchRotateInteraction;
+			var toolbar = new Toolbar('sbgcui_main_toolbar');
+			const controls = map.getControls();
+			const interactions = map.getInteractions();
 
-			map.getInteractions().forEach(interaction => {
+			interactions.forEach(interaction => {
 				switch (interaction.constructor) {
 					case ol.interaction.DragPan:
 						dragPanInteraction = interaction;
@@ -2184,31 +2322,54 @@
 					case ol.interaction.DoubleClickZoom:
 						doubleClickZoomInteraction = interaction;
 						break;
+					case ol.interaction.PinchRotate:
+						pinchRotateInteraction = interaction;
+						break;
 				}
 			});
-			dragPanInteraction?.setActive(localStorage.getItem('follow') == 'false');
-			doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
 
+			dragPanInteraction.setActive(toggleFollow.dataset.active != 'true');
+			doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
+
+
+			controls.forEach(control => {
+				switch (control.constructor) {
+					case ol.control.Attribution:
+						attributionControl = control;
+						break;
+					case ol.control.Rotate:
+						rotateControl = control;
+						break;
+				}
+			});
+
+			map.removeControl(attributionControl);
+			map.removeControl(rotateControl);
 			map.addControl(toolbar);
 
 
-			const stadiaLabel = document.createElement('label');
-			const stadiaInput = document.createElement('input');
-			const stadiaSpan = document.createElement('span');
-			const isSelected = JSON.parse(localStorage.getItem('settings')).base == 'stadia';
+			const stadiaWatercolorLabel = document.createElement('label');
+			const stadiaTonerLabel = document.createElement('label');
 
-			stadiaLabel.classList.add('layers-config__entry');
+			[stadiaWatercolorLabel, stadiaTonerLabel].forEach((label, index) => {
+				const input = document.createElement('input');
+				const span = document.createElement('span');
+				const theme = index == 0 ? 'Watercolor' : 'Toner';
+				const isSelected = JSON.parse(localStorage.getItem('settings')).base == `stadia_${theme.toLowerCase()}`;
 
-			stadiaInput.type = 'radio';
-			stadiaInput.name = 'baselayer';
-			stadiaInput.value = 'stadia';
-			stadiaInput.checked = isSelected;
+				label.classList.add('layers-config__entry');
 
-			stadiaSpan.innerText = 'Stamen Watercolor'
+				input.type = 'radio';
+				input.name = 'baselayer';
+				input.value = `stadia_${theme.toLowerCase()}`;
+				input.checked = isSelected;
 
-			stadiaLabel.append(stadiaInput, stadiaSpan);
+				span.innerText = `Stadia ${theme}`
 
-			document.querySelector('input[value="osm"]').parentElement.after(stadiaLabel);
+				label.append(input, span);
+			});
+
+			document.querySelector('input[value="osm"]').parentElement.after(stadiaWatercolorLabel, stadiaTonerLabel);
 		}
 
 
@@ -2298,12 +2459,12 @@
 						e.style.setProperty('--sbgcui-display-r-button', 'flex');
 					}
 				}
-				
+
 				return makeEntry(e, data);
 			}
 
 			window.makeEntryDec = makeEntryDec;
-			
+
 			inventoryContent.addEventListener('click', event => {
 				if (!event.currentTarget.matches('.inventory__content[data-tab="3"]')) { return; }
 				if (!event.target.closest('.inventory__item-controls')) { return; }
@@ -2598,7 +2759,7 @@
 						guidSpan.innerText = `GUID: ${guid}`;
 
 						guidSpan.addEventListener('click', _ => {
-							window.navigator.clipboard.writeText(`${window.location.origin}/?point=${guid}`).then(_ => {
+							window.navigator.clipboard.writeText(`${window.location.origin + window.location.pathname}?point=${guid}`).then(_ => {
 								let toast = createToast('Ссылка на точку скопирована в буфер обмена.');
 								toast.showToast();
 							});
@@ -2825,7 +2986,7 @@
 				let guid = event.target.closest('.inventory__item').dataset.ref;
 
 				if (!guid) { return; }
-				if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/?point=${guid}`; }
+				if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/app/?point=${guid}`; }
 			});
 		}
 
@@ -3237,25 +3398,61 @@
 		/* Показ радиуса катализатора */
 		{
 			function drawBlastRange() {
-				let activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
-				let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
-				let item = cache.find(e => e.g == activeSlide.dataset.guid);
-				let level = item.l;
-				let range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
+				const activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
+				const cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+				const item = cache.find(e => e.g == activeSlide.dataset.guid);
+				const level = item.l;
+				const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
 
 				playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
 				playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
 				playerFeature.changed();
+
+				if (isFollow) { view.fitBlastRange(); }
 			}
 
 			function hideBlastRange() {
+				const currentZoom = view.getZoom();
+				const { beforeAttackZoom, blastRangeZoom } = view.getProperties();
+				onCloseZoom = currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom;
+
 				playerFeature.getStyle()[3].getGeometry().setRadius(0);
 				playerFeature.changed();
+
+				if (isFollow) { resetView(); }
 			}
 
+			function resetView(isCompleted) {
+				if (isCompleted) { return; }
+				view.setTopPadding();
+				view.animate(
+					{
+						center: playerFeature.getGeometry().getCoordinates(),
+						zoom: onCloseZoom,
+						duration: 0, // Временно отключено
+					},
+					resetView
+				);
+			}
+
+			function saveCurrentZoom() {
+				view.setProperties({
+					beforeAttackZoom: view.getZoom(),
+					isZoomChanged: false
+				});
+			}
+
+			function zoomContainerClickHandler(event) {
+				const isZoomButtonClicked = event.target.matches('.ol-zoom-in, .ol-zoom-out');
+				if (isAttackSliderOpened && isZoomButtonClicked) { view.set('isZoomChanged', true); }
+			}
+
+			let onCloseZoom;
+
+			attackSlider.addEventListener('attackSliderOpened', saveCurrentZoom);
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
-			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
 			attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
+			zoomContainer.addEventListener('click', zoomContainerClickHandler);
 		}
 
 
@@ -3796,7 +3993,7 @@
 			const pointControls = document.querySelector('.info.popup .i-buttons');
 			const pointStat = document.querySelector('.info.popup .i-stat');
 			const destroyRewardDiv = document.createElement('div');
-			const rewardText = i18next.language == 'ru' ? 'Награда' : 'Reward';
+			const rewardText = i18next.language.includes('ru') ? 'Награда' : 'Reward';
 			const formatter = new Intl.NumberFormat(i18next.language);
 
 			destroyRewardDiv.classList.add('i-stat__entry');
@@ -3818,47 +4015,45 @@
 				zIndex: 9
 			});
 
-			fetch(`${HOME_DIR}/assets/html/zero-point-info.html`)
-				.then(r => r.text())
-				.then(html => {
-					const parser = new DOMParser();
-					const popup = parser.parseFromString(html, 'text/html').body.firstChild;
-					const zeroPointFeature = new ol.Feature({
-						geometry: new ol.geom.Point([0, 0])
+			try {
+				const popup = await fetchHTMLasset('zero-point-info');
+				const zeroPointFeature = new ol.Feature({
+					geometry: new ol.geom.Point([0, 0])
+				});
+
+				popup.addEventListener('click', () => {
+					popup.classList.add('sbgcui_hidden');
+					setTimeout(() => { popup.style.zIndex = 0; }, 100);
+				});
+				document.body.appendChild(popup);
+
+				zeroPointFeature.setId('sbgcui_zeroPoint');
+				zeroPointFeature.setStyle(new ol.style.Style({
+					geometry: new ol.geom.Circle([0, 0], 30),
+					fill: new ol.style.Fill({ color: '#BB7100' }),
+					stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 5 }),
+					text: new ol.style.Text({
+						font: '30px Manrope',
+						text: '?',
+						fill: new ol.style.Fill({ color: '#000' }),
+						stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
+					}),
+				}));
+
+				map.on('click', event => {
+					const features = map.getFeaturesAtPixel(event.pixel, {
+						layerFilter: layer => layer.get('name') == 'sbgcui_points',
 					});
 
-					popup.addEventListener('click', () => {
-						popup.classList.add('sbgcui_hidden');
-						setTimeout(() => { popup.style.zIndex = 0; }, 100);
-					});
-					document.body.appendChild(popup);
-
-					zeroPointFeature.setId('sbgcui_zeroPoint');
-					zeroPointFeature.setStyle(new ol.style.Style({
-						geometry: new ol.geom.Circle([0, 0], 30),
-						fill: new ol.style.Fill({ color: '#BB7100' }),
-						stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 5 }),
-						text: new ol.style.Text({
-							font: '30px Manrope',
-							text: '?',
-							fill: new ol.style.Fill({ color: '#000' }),
-							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
-						}),
-					}));
-
-					map.on('click', event => {
-						const features = map.getFeaturesAtPixel(event.pixel, {
-							layerFilter: layer => layer.get('name') == 'sbgcui_points',
-						});
-
-						if (features.includes(zeroPointFeature)) {
-							popup.classList.remove('sbgcui_hidden');
-							setTimeout(() => { popup.style.zIndex = 9; }, 100);
-						}
-					});
-					customPointsSource.addFeature(zeroPointFeature);
-				})
-				.catch(error => { console.log('Ошибка при загрузке ресурса.', error); });
+					if (features.includes(zeroPointFeature)) {
+						popup.classList.remove('sbgcui_hidden');
+						setTimeout(() => { popup.style.zIndex = 9; }, 100);
+					}
+				});
+				customPointsSource.addFeature(zeroPointFeature);
+			} catch (error) {
+				console.log(error);
+			}
 
 			map.addLayer(customPointsLayer);
 		}
@@ -3889,7 +4084,7 @@
 
 				if (features.length == 1) { message += `\n\nПлощадь региона: ${maxArea}.`; }
 				if (features.length > 1) { message += `\n\nПлощадь самого большого региона: ${maxArea}.\nПлощадь самого маленького региона: ${minArea}.`; }
-				
+
 				alert(message);
 			}
 
@@ -3901,12 +4096,12 @@
 			toolbar.addItem(button, 5);
 		}
 
-	
+
 		/* Время до разрядки точки */
 		{
 			function updateTimeout() {
 				if (config.ui.pointDischargeTimeout) {
-					timeoutSpan.innerText = `~${lastOpenedPoint.dischargeTimeout}`;
+					timeoutSpan.innerText = `(~${lastOpenedPoint.dischargeTimeout})`;
 				}
 			}
 
@@ -3917,6 +4112,214 @@
 
 			pointPopup.addEventListener('pointPopupOpened', updateTimeout);
 			pointPopup.addEventListener('pointRepaired', updateTimeout);
+		}
+
+
+		/* Вращение карты */
+		{
+			let isRotationLocked = ['true', null].includes(localStorage.getItem('sbgcui_isRotationLocked'));
+			let latestTouchPoint = null;
+			let touches = [];
+			const lockRotationButton = document.createElement('button');
+			const mapDiv = document.getElementById('map');
+
+			function rotateView(pointA, pointB) {
+				const center = map.getPixelFromCoordinate(view.getCenter());
+				const aAngle = Math.atan2((pointA[1] - center[1]), (pointA[0] - center[0]));
+				const bAngle = Math.atan2((pointB[1] - center[1]), (pointB[0] - center[0]));
+				const anchor = map.getCoordinateFromPixel(center);
+
+				view.adjustRotation(bAngle - aAngle, anchor);
+			}
+
+			function resetView(isCompleted) {
+				if (isCompleted) { return; }
+
+				view.animate({ rotation: 0 }, resetView);
+			}
+
+			function toggleRotationLock(event) {
+				// Если был эвент нажатия кнопки — переключаем.
+				// Иначе функция вызвана при запуске скрипта и должна установить сохранённое ранее значение.
+				if (event) { isRotationLocked = !isRotationLocked; }
+
+				if (isRotationLocked) { resetView(); }
+				pinchRotateInteraction.setActive(!isRotationLocked);
+				lockRotationButton.setAttribute('sbgcui_locked', isRotationLocked);
+				localStorage.setItem('sbgcui_isRotationLocked', isRotationLocked);
+			}
+
+			function touchStartHandler(event) {
+				if (isRotationLocked) { return; }
+				if (!isFollow) { return; }
+				if (event.target.nodeName != 'CANVAS') { return; }
+				if (event.targetTouches.length > 1) { return; }
+
+				latestTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
+				touches = [];
+			}
+
+			function touchMoveHandler(event) {
+				event.preventDefault();
+
+				if (latestTouchPoint == null) { return; }
+
+				const ongoingTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
+
+				rotateView(latestTouchPoint, ongoingTouchPoint);
+				latestTouchPoint = ongoingTouchPoint;
+				touches.push(ongoingTouchPoint);
+			}
+
+			function touchEndHandler() {
+				if (touches.length != 0) { window.requestEntities(); }
+				latestTouchPoint = null;
+			}
+
+			function rotationChangeHandler() {
+				const isAnimating = view.getAnimating();
+
+				if (isFollow && !isAnimating) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
+				lockRotationButton.style.setProperty('--sbgcui_angle', `${view.getRotation() * 180 / Math.PI}deg`);
+			}
+
+			toggleRotationLock();
+
+			lockRotationButton.classList.add('fa', 'fa-solid-compass', 'sbgcui_lock_rotation');
+			lockRotationButton.addEventListener('click', toggleRotationLock);
+
+			toggleFollow.before(lockRotationButton);
+
+			mapDiv.addEventListener('touchstart', touchStartHandler);
+			mapDiv.addEventListener('touchmove', touchMoveHandler);
+			mapDiv.addEventListener('touchend', touchEndHandler);
+
+			view.on('change:rotation', rotationChangeHandler);
+		}
+
+
+		/* Навигация к точке */
+		{
+			try {
+				if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
+
+				function createURL(app, routeType) {
+					const [lonA, latA] = ol.proj.toLonLat(playerFeature.getGeometry().getCoordinates());
+					const [lonB, latB] = lastOpenedPoint.coords;
+					let url;
+
+					switch (app) {
+						case 'yamaps':
+							url = `yandexmaps://maps.yandex.ru/?rtext=${latA},${lonA}~${latB},${lonB}&rtt=${routeType}`;
+							break;
+						case 'yanavi':
+							url = `yandexnavi://build_route_on_map?lat_from=${latA}&lon_from=${lonA}&lat_to=${latB}&lon_to=${lonB}`;
+							break;
+						case 'dgis':
+							url = `dgis://2gis.ru/routeSearch/rsType/${routeType}/from/${lonA},${latA}/to/${lonB},${latB}`;
+							break;
+						case 'gmaps':
+							url = `comgooglemaps://?saddr=${latA},${lonA}&daddr=${latB},${lonB}&directionsmode=${routeType}`;
+							break;
+					}
+
+					return url;
+				}
+
+				function routeTypeClickHandler(event) {
+					const app = event.currentTarget.dataset.app;
+					const routeType = event.target.dataset.routetype;
+
+					if (event.target.nodeName != 'LI') { return; }
+					if (event.target.hasAttribute('data-selected')) {
+						delete event.target.dataset.selected;
+						delete submitButton.dataset.app;
+						delete submitButton.dataset.routetype;
+						return;
+					}
+
+					navPopup.querySelectorAll('li[data-selected]').forEach(e => { delete e.dataset.selected; })
+					event.target.dataset.selected = '';
+					submitButton.dataset.app = app;
+					submitButton.dataset.routetype = routeType;
+				}
+
+				function closeNavPopup() {
+					navPopup.classList.add('sbgcui_hidden');
+				}
+
+				function toggleNavPopup() {
+					navPopup.classList.toggle('sbgcui_hidden');
+				}
+
+				const navPopup = await fetchHTMLasset('navigate');
+				const coordsSpan = navPopup.querySelector('.sbgcui_navigate-coords');
+				const form = navPopup.querySelector('form');
+				const menus = navPopup.querySelectorAll('menu');
+				const [cancelButton, submitButton] = navPopup.querySelectorAll('.sbgcui_navigate-form-buttons > button');
+				const navButton = document.createElement('button');
+
+				navButton.classList.add('fa', 'fa-solid-route', 'sbgcui_button_reset', 'sbgcui_navbutton');
+				navButton.addEventListener('click', toggleNavPopup);
+				pointPopup.appendChild(navButton);
+
+				pointPopup.addEventListener('pointPopupOpened', () => {
+					coordsSpan.innerText = lastOpenedPoint.coords.slice().reverse().join(', ');
+				});
+				coordsSpan.addEventListener('click', () => {
+					window.navigator.clipboard.writeText(coordsSpan.innerText).then(() => {
+						const toast = createToast('Координаты скопированы в буфер обмена.');
+						toast.showToast();
+					});
+				});
+
+				form.addEventListener('submit', event => { event.preventDefault(); })
+
+				menus.forEach(menu => {
+					menu.addEventListener('click', routeTypeClickHandler);
+				});
+
+				cancelButton.addEventListener('click', closeNavPopup);
+				submitButton.addEventListener('click', () => {
+					const url = createURL(submitButton.dataset.app, submitButton.dataset.routetype);
+					if (url != undefined) {
+						window.location.href = url;
+						closeNavPopup();
+					}
+				});
+
+				pointPopupCloseButton.addEventListener('click', closeNavPopup)
+
+				document.body.appendChild(navPopup);
+			} catch (error) {
+				console.log(error);
+			}
+		}
+
+
+		/* Поворот стрелки игрока */
+		{
+			function rotateArrow(event) {
+				const deviceRotationDeg = event.webkitCompassHeading;
+
+				if (Math.abs(playerArrowRotationDeg - deviceRotationDeg) > 3) {
+					const playerArrowRotationRad = deviceRotationDeg * Math.PI / 180;
+
+					playerArrow.setRotation(playerArrowRotationRad + view.getRotation());
+					playerFeature.changed();
+
+					playerArrowRotationDeg = deviceRotationDeg;
+				}
+			}
+
+			const playerArrow = playerFeature.getStyle()[0].getImage();
+			let playerArrowRotationDeg = 0;
+
+			if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+				document.body.addEventListener('click', () => { DeviceOrientationEvent.requestPermission(); }, { once: true });
+
+				window.addEventListener('deviceorientation', rotateArrow);
+			}
 		}
 
 
