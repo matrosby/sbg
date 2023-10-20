@@ -2044,7 +2044,7 @@
 
 			[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-			styles.setAttribute('href', `https://raw.githubusercontent.com/matrosby/sbg/master/styles.css`);
+			styles.setAttribute('href', `https://raw.githubusercontent.com/matrosby/sbg/master/styles.min.css`);
 			fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
 			faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
