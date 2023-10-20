@@ -23,7 +23,7 @@
 	const DISCOVERY_COOLDOWN = 90;
 	const PLAYER_RANGE = 45;
 	const HIT_TOLERANCE = 15;
-	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
+	const VIEW_PADDING = (window.innerHeight / 2) * 1.0;
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
@@ -2044,7 +2044,7 @@
 
 			[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-			styles.setAttribute('href', `https://raw.githubusercontent.com/matrosby/sbg/master/styles.min.css`);
+			styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
 			fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
 			faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
