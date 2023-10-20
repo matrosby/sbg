@@ -3,11 +3,30 @@ https://raw.githubusercontent.com/matrosby/sbg/master/cui.js
 https://raw.githubusercontent.com/matrosby/sbg/master/eui.min.js
 https://raw.githubusercontent.com/matrosby/sbg/master/styles.min.css
 
-
 https://matros.by/sbg/plus.min.js
 https://matros.by/sbg/cui.js
 https://matros.by/sbg/eui.min.js
 https://matros.by/sbg/styles.min.css
 
+https://anmiles.net/userscripts/sbg.plus.user.min.js
+https://raw.githubusercontent.com/nicko-v/sbg-cui/main/index.js
+https://github.com/egorantonov/sbg-enhanced/releases/latest/download/index.js
 
+========================
 
+Замена:
+
+function makeInfoPopupSemiTransparent(){setCSS(`\n            .info.popup {\n                background:rgba(0,0,0,0.7);\n            }\n        .i-buttons>button {\n        min-height: 60px;\n        }\n        `)}
+
+function fixSortButton(e){setCSS(`\n            .sbgcui_refs-sort-button {\n                z-index: 100 !important;\n            bottom: 120px;\n\            right: 55px;\n            }\n            #inventory__close {\n                bottom: 70px;\n            }`)}
+
+=======================
+
+function getCUIScriptSrc(){return"https://matros.by/sbg/cui.js"}function getEUIScriptSrc(){return"https://matros.by/sbg/eui.min.js"}
+
+========================
+
+function makeInfoPopupSemiTransparent(){setCSS(`\n\t\t.info.popup {\n\t\t\tbackground:rgba(0,0,0,0.7);\n\t\t}\n\t`)}
+function moveRefsSortButton(){setCSS(`\n\t\t.sbgcui_refs-sort-button {\n\t\t\tbottom: 120px;\n\t\t\tright: 55px;\n\t\t}\n\t`)}
+function makePointInfoButton(){setCSS(`\n\t\t.i-buttons>button {\n\t\t\tmin-height: 60px;\n\t\t}\n\t`)}
+function disableHitTolerance(data){return data.replace(/const HIT_TOLERANCE = \d+/,"const HIT_TOLERANCE = 0")}
