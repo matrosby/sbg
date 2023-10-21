@@ -23,7 +23,7 @@
 	const DISCOVERY_COOLDOWN = 90;
 	const PLAYER_RANGE = 45;
 	const HIT_TOLERANCE = 15;
-	const VIEW_PADDING = window.innerHeight / 2;
+	const VIEW_PADDING = 0;
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
