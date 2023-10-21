@@ -28,7 +28,7 @@
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
-	const HIGHLEVEL_MARKER = 9;
+	const HIGHLEVEL_MARKER = 8;
 	const LANG = i18next.language;
 	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
 	const IS_CDB_MAP = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
