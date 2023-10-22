@@ -26,8 +26,8 @@
 	const VIEW_PADDING = 0;
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
-	const INVIEW_POINTS_LIMIT = 100;
-	const INVIEW_MARKERS_MAX_ZOOM = 16;
+	const INVIEW_POINTS_LIMIT = 200;
+	const INVIEW_MARKERS_MAX_ZOOM = 15;
 	const HIGHLEVEL_MARKER = 8;
 	const LANG = i18next.language;
 	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
