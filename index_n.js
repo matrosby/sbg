@@ -2,8 +2,8 @@
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
 // @version      1.14.24m
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
+// @downloadURL  https://raw.githubusercontent.com/matrosby/sbg/master/index_n.js
+// @updateURL    https://raw.githubusercontent.com/matrosby/sbg/master/index_n.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://sbg-game.ru/app/*
