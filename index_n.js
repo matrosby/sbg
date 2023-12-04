@@ -47,7 +47,7 @@
 	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
 	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
 	const DISCOVERY_COOLDOWN = 90;
-	const HIGHLEVEL_MARKER = 9;
+	const HIGHLEVEL_MARKER = 8;
 	const HIT_TOLERANCE = 0;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
