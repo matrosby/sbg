@@ -4393,7 +4393,7 @@
 				pointPopup.appendChild(jumpToButton);
 
 				try {
-					if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error('Навигационные ссылки не поддерживаются в APK.'); }
+					if (window.navigator.userAgent.toLowerCase().includes('wvw')) { throw new Error('Навигационные ссылки не поддерживаются в APK.'); }
 
 					function createURL(app, routeType) {
 						const [lonA, latA] = ol.proj.toLonLat(playerFeature.getGeometry().getCoordinates());
