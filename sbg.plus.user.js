@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           SBG plus
 // @namespace      sbg
-// @version        0.9.54
+// @version        00.9.54
 // @updateURL      https://anmiles.net/userscripts/sbg.plus.user.js
 // @downloadURL    https://anmiles.net/userscripts/sbg.plus.user.js
 // @description    Extended functionality for SBG
@@ -11,7 +11,7 @@
 // @run-at         document-start
 // @grant          none
 // ==/UserScript==
-window.__sbg_plus_version = '0.9.54';
+window.__sbg_plus_version = '00.9.54';
 (function () {
     class EventWatcher {
         constructor(eventTypes) {
