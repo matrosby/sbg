@@ -3666,7 +3666,7 @@
 
 				geolocation.on('change:speed', () => {
 					const speed_mps = geolocation.getSpeed() || 0;
-					speedSpan.innerText = (speed_mps * 3.6).toFixed(1) + ' km/h';
+					speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
 				});
 			}
 
