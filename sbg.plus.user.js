@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           SBG plus
 // @namespace      sbg
-// @version        0.9.52m
+// @version        0.9.54
 // @updateURL      https://anmiles.net/userscripts/sbg.plus.user.js
 // @downloadURL    https://anmiles.net/userscripts/sbg.plus.user.js
 // @description    Extended functionality for SBG
@@ -11,7 +11,7 @@
 // @run-at         document-start
 // @grant          none
 // ==/UserScript==
-window.__sbg_plus_version = '0.9.52m';
+window.__sbg_plus_version = '0.9.54';
 (function () {
     class EventWatcher {
         constructor(eventTypes) {
@@ -615,7 +615,7 @@ window.__sbg_plus_version = '0.9.52m';
     new Transformer(disableAttackZoom, { ru: 'Отключить изменение зума при атаке', en: 'Disable changing zoom when attack' }, { public: true, simple: true, group, trigger: 'cuiTransform' });
     new Transformer(unlockCompassWhenRotateMap, { ru: 'Разблокировать компас при вращении карты', en: 'Unlock compass when rotate map' }, { public: true, group, trigger: 'cuiTransform' });
     new Transformer(alwaysClearInventory, { ru: 'Запускать авточистку инвентаря после каждого дискавера', en: 'Launch inventory cleanup after every discover' }, { public: true, group, trigger: 'cuiTransform', unchecked: true });
-    new Transformer(waitClearInventory, { ru: 'Дожидаться получения предметов перед запуском авточистки', en: 'Wait for updating inventory before cleanup' }, { public: true, group, trigger: 'cuiTransform' });
+    new Transformer(waitClearInventory, { ru: 'Дожидаться получения предметов перед запуском авточистки', en: 'Wait for updating inventory before cleanup' }, { public: false, group, trigger: 'cuiTransform' });
     new Feature(fixSortButton, { ru: 'Исправить расположение кнопки сортировки', en: 'Fix sort button z-index' }, { public: true, group, trigger: 'mapReady', requires: () => $('.sbgcui_refs-sort-button') });
     new Feature(reportCUIUpdates, { ru: 'Сообщать об обновлениях скрипта', en: 'Report script updates' }, { public: true, group, trigger: 'mapReady', unchecked: true });
     group = 'eui';
@@ -1086,11 +1086,11 @@ window.__sbg_plus_version = '0.9.52m';
         window.__sbg_urls = {
             desktop: {
                 local: 'sbg.plus.user.js',
-                remote: 'https://raw.githubusercontent.com/matrosby/sbg/master/sbg.plus.user.js',
+                remote: 'https://anmiles.net/userscripts/sbg.plus.user.js',
             },
             mobile: {
                 local: 'sbg.plus.user.min.js',
-                remote: 'https://raw.githubusercontent.com/matrosby/sbg/master/sbg.plus.user.min.js',
+                remote: 'https://anmiles.net/userscripts/sbg.plus.user.min.js',
             },
             intel: {
                 local: 'intel.js',
@@ -1102,11 +1102,11 @@ window.__sbg_plus_version = '0.9.52m';
             },
             cui: {
                 local: 'nicko.js',
-                remote: 'https://raw.githubusercontent.com/matrosby/sbg/master/index_n.js',
+                remote: 'https://raw.githubusercontent.com/nicko-v/sbg-cui/main/index.js',
             },
             eui: {
                 local: 'egor.js',
-                remote: 'https://raw.githubusercontent.com/matrosby/sbg/master/index_e.js',
+                remote: 'https://github.com/egorantonov/sbg-enhanced/releases/latest/download/index.js',
             },
         };
     }
@@ -1427,26 +1427,17 @@ window.__sbg_plus_version = '0.9.52m';
     function fixCompatibility(script) {
         return script
             .replace('fetch(\'/app/script.js\')', '(async () => ({ text: async () => window.__sbg_script_modified }))()')
-            .replace('window.stop', 'if (false) window.stop')
-            .replace('window.navigator.geolocation.clearWatch', 'if (false) window.navigator.geolocation.clearWatch')
-            .replace('document.open', 'if (false) document.open')
-            .replace('fetch(\'/app\')', 'if (false) fetch(\'/\')')
+            .replace('window.stop', 'false && window.stop')
+            .replace('window.navigator.geolocation.clearWatch', 'false && window.navigator.geolocation.clearWatch')
+            .replace('document.open', 'false && document.open')
+            .replace('fetch(\'/app\')', 'false && fetch(\'/app\')')
             .replace(/$/, 'window.cuiEmbedded = true')
             .replace(/window\.onerror = (.*);/, (_match, func) => `window.__sbg_onerror_handlers.push(${func});`)
             .expose('__sbg_cui', {
             functions: {
                 readable: ['olInjection', 'loadMainScript', 'main'],
             },
-        })
-            // TODO: debug
-            .replaceAll('notifs = await getNotifs();', `notifs = await getNotifs();
-				window.__sbg_debug_object('CUI debug', { notifications: config.notifications });
-				window.__sbg_debug_object('CUI debug', { notifs_0: notifs[0] });
-				window.__sbg_debug_object('CUI debug', { notifs });
-				`)
-            .replace('await getNotifs(latestNotifId);', `await getNotifs(latestNotifId);
-				window.__sbg_debug_object('CUI debug', { notifsCount }, 'string');
-				`);
+        });
     }
     function setViewAnimationDuration() {
         if (typeof window.__sbg_plus_animation_duration === 'number') {
@@ -1512,13 +1503,19 @@ window.__sbg_plus_version = '0.9.52m';
             .replace(/const MIN_FREE_SPACE = \d+/, 'const MIN_FREE_SPACE = INVENTORY_LIMIT');
     }
     function waitClearInventory(script) {
-        $('#discover').on('click', () => {
-            window.__sbg_plus_localStorage_watcher.on('getItem', () => {
-                window.__sbg_cui_function_clearInventory(false);
-            }, { key: 'inventory-cache', when: 'after', once: true });
-        });
-        return script
-            .replace('clearInventory(false, toDelete);', '// clearInventory(false, toDelete);');
+        return script;
+        // TODO: fix
+        // $('#discover').on('click', () => {
+        // 	(window.__sbg_plus_localStorage_watcher as LocalStorageWatcher).on('getItem', () => {
+        // 		window.__sbg_cui_function_clearInventory(false);
+        // 	}, { key : 'inventory-cache', when : 'after', once : true });
+        // });
+        // return script
+        // 	.replace(
+        // 		'await clearInventory(false, toDelete);',
+        // 		'// await clearInventory(false, toDelete);',
+        // 	)
+        // ;
     }
     function disableCarouselAnimation() {
         window.Splide.defaults = window.Splide.defaults || {};
