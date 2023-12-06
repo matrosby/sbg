@@ -3126,7 +3126,6 @@
 					favsListContent.classList.add('sbgcui_favs-content');
 
 					favsListHeader.innerText = 'Избранные точки';
-					favsListDescription.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
 
 					favsList.append(favsListHeader, favsListDescription, favsListContent);
 
