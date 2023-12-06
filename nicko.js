@@ -50,6 +50,7 @@
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
+	const HOME_DIR_2 = 'https://matros.by/sbg';
 	const INVENTORY_LIMIT = 3000;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const INVIEW_POINTS_DATA_TTL = 7000;
@@ -1852,7 +1853,7 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+				styles.setAttribute('href', `${HOME_DIR_2}/styles.min.css`);
 				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
 				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
