@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const USERSCRIPT_VERSION = '01.14.26';
-	const VIEW_PADDING = (window.innerHeight / 2) * 0;
+	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
 	const config = {}, state = {}, favorites = {};
