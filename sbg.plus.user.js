@@ -1086,11 +1086,11 @@ window.__sbg_plus_version = '0.9.54';
         window.__sbg_urls = {
             desktop: {
                 local: 'sbg.plus.user.js',
-                remote: 'https://anmiles.net/userscripts/sbg.plus.user.js',
+                remote: 'https://matros.by/sbg/sbg.plus.user.js',
             },
             mobile: {
                 local: 'sbg.plus.user.min.js',
-                remote: 'https://anmiles.net/userscripts/sbg.plus.user.min.js',
+                remote: 'https://matros.by/sbg/sbg.plus.user.min.js',
             },
             intel: {
                 local: 'intel.js',
@@ -1102,11 +1102,11 @@ window.__sbg_plus_version = '0.9.54';
             },
             cui: {
                 local: 'nicko.js',
-                remote: 'https://raw.githubusercontent.com/nicko-v/sbg-cui/main/index.js',
+                remote: 'https://raw.githubusercontent.com/matrosby/sbg/master/nicko.js',
             },
             eui: {
                 local: 'egor.js',
-                remote: 'https://github.com/egorantonov/sbg-enhanced/releases/latest/download/index.js',
+                remote: 'https://matros.by/sbg/egor.js',
             },
         };
     }
