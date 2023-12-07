@@ -1756,7 +1756,7 @@
 					toastify.defaults.oldestFirst = options.oldestFirst ?? true;
 
 					options.style = {
-						fontSize: '1.0em',
+						fontSize: '0.8em',
 					};
 
 					return toastify(options);
