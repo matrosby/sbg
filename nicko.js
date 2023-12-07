@@ -1034,7 +1034,7 @@
 						if (isEnoughSpace && !forceClear && filteredLoot.length == 0) { throw { silent: true }; }
 
 						if (!isEnoughSpace || forceClear) {
-							// Если надо удалить все ключи или вообще никакие не надо удалять - не запрашиваем данные точек.
+							
 							if ((allied == -1 && hostile == -1) || (allied == 0 && hostile == 0)) { return [inventory, filteredLoot, []]; }
 
 							// У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
@@ -1087,7 +1087,7 @@
 							const toDeleteItem = toDelete.find(item => item.guid == filteredLootItem.guid);
 							if (toDeleteItem) {
 								toDeleteItem.amount += filteredLootItem.amount;
-								toDeleteItem.filtered = filteredLootItem.amount; // Эти предметы не будут добавлены в кэш основным скриптом, т.к. удаляются сразу же.
+								toDeleteItem.filtered = filteredLootItem.amount; 
 							} else {
 								toDelete.push({ ...filteredLootItem, filtered: filteredLootItem.amount });
 							}
@@ -1104,7 +1104,6 @@
 							if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) { inventoryButton.style.color = ''; }
 						}
 
-						/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
 						deleteFromCacheAndSliders(deleted);
 
 
@@ -1542,9 +1541,6 @@
 												let dateNow = Date.now();
 												let discoveriesLeft;
 
-												// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
-												// После выжигания в burnout приходит таймстамп остывания точки.
-												// 20 хаков – с запасом на случай ивентов.
 												if (parsedResponse.burnout <= 20) {
 													discoveriesLeft = parsedResponse.burnout;
 												} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
@@ -1750,9 +1746,6 @@
 
 					if (options.className?.startsWith('sbgcui_') == false) { options.selector = null; }
 
-					// Есть баг в Toastify - значение oldestFirst всегда берётся
-					// из дефолтного конфига тоста, даже если оно передано в options.
-					// Поэтому здесь каждый раз изменяется дефолтное значение.
 					toastify.defaults.oldestFirst = options.oldestFirst ?? true;
 
 					options.style = {
@@ -2064,8 +2057,6 @@
 
 					hideControls();
 
-					// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
-					// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
 					window.draw_slider.emit('active', { slide: drawSlider.querySelector('.splide__slide.is-active') });
 				});
 
@@ -2401,9 +2392,7 @@
 					if (!event.target.closest('.inventory__item.loaded')) { return; }
 
 					// Ширина блока кнопок "V M" около 30 px.
-					// Правее них находится кнопка-псевдоэлемент "R".
-					// Если нажато дальше 30px (50 – с запасом на возможное изменение стиля), значит нажата псевдокнопка, если нет – одна из кнопок V/M.
-					// Приходится указывать конкретное число (50), потому что кнопка V при нажатии получает display: none и не имеет offsetWidth.
+					
 					if (event.offsetX < 50) { return; }
 
 					const pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
@@ -2419,8 +2408,7 @@
 			/* Меню настроек */
 			{
 				function closeDetails(event) {
-					// Если передан event - будут закрыты все details кроме нажатого.
-					// Если не передан - будут закрыты все details.
+					
 					if (event != undefined && !event.target.matches('summary')) { return; }
 
 					settingsMenu.querySelectorAll('details').forEach(element => {
@@ -2431,7 +2419,7 @@
 				}
 
 				function onBrandingInputChange() {
-					// Приводим цвет к виду #RRGGBB, т.к. основной скрипт для линий использует четырёхзначную нотацию (RGB + альфа).
+
 					brandingInput.value = hex623(brandingInput.value, false);
 				}
 
@@ -2456,8 +2444,6 @@
 
 					const { mapFilters, ui } = config;
 
-					// Возвращаем фильтрам последние сохранённые значения, т.к. CSS переменные
-					// меняются, чтобы в процессе показать, как будет выглядеть.
 					for (let filter in mapFilters) {
 						setFilterCSSVar(filter, mapFilters[filter]);
 					}
@@ -2534,9 +2520,7 @@
 					const select = event.target;
 					const value = select.value;
 
-					// Можно использовать либо один целый наружный маркер (outerMarker), либо два полукольца –
-					// верхнее и нижнее (outerTop, outerBottom). Если выбран целый маркер, отключаем селекты полуколец.
-					// Если выбраны полукольца – отключаем селект целого.
+					
 					switch (select) {
 						case outerMarkerSelect:
 							switchMarkersSelectsOff([outerTopMarkerSelect, outerBottomMarkerSelect]);
@@ -2547,8 +2531,7 @@
 							break;
 					}
 
-					// Можно узнать только одно значение за запрос – либо уникальный захват, либо уникальное посещение.
-					// Если выбрано uniqc, отключаем uniqv во всех остальных селектах и наоборот.
+
 					if (/^uniq(c|v)$/.test(value)) {
 						const selectsToOff = markersSelects.filter(e => e != select);
 						switchMarkersSelectsOff(selectsToOff, value);
@@ -4321,8 +4304,7 @@
 				}
 
 				function toggleRotationLock(event) {
-					// Если был эвент нажатия кнопки — переключаем.
-					// Иначе функция вызвана при запуске скрипта и должна установить сохранённое ранее значение.
+
 					if (event) { isRotationLocked = !isRotationLocked; }
 
 					if (isRotationLocked) { resetView(); }
@@ -4892,7 +4874,7 @@
 												const distance = action.distance;
 												const distanceString = i18next.t(`units.${distance >= 1000 ? 'km' : 'm'}`, { count: distance >= 1000 ? distance / 1000 : distance });
 												const regionsAmount = action.regions instanceof Array ? action.regions.length : action.regions;
-												// Сначала регионы хранились в виде массива объектов, затем в виде числа - количество регионов, сейчас в виде массива площадей.
+
 
 												fromLink.innerText = guidsTitles[action.from];
 												toLink.innerText = guidsTitles[action.to];
