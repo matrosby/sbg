@@ -50,7 +50,7 @@
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	const HOME_DIR_2 = 'https://matros.by/sbg';
+	const HOME_DIR_M = 'https://matros.by/sbg';
 	const INVENTORY_LIMIT = 3000;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const INVIEW_POINTS_DATA_TTL = 7000;
@@ -1173,7 +1173,7 @@
 			}
 
 			async function fetchHTMLasset(filename) {
-				return fetch(`${HOME_DIR}/assets/html/${filename}.html`)
+				return fetch(`${HOME_DIR_M}/${filename}.html`)
 					.then(r => {
 						if (r.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${r.status})`); }
 						return r.text();
@@ -1846,7 +1846,7 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', `${HOME_DIR_2}/styles.min.css`);
+				styles.setAttribute('href', `${HOME_DIR_M}/styles.min.css`);
 				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
 				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
