@@ -1173,7 +1173,7 @@
 			}
 
 			async function fetchHTMLasset(filename) {
-				return fetch(`${HOME_DIR_M}/${filename}.html`)
+				return fetch(`${HOME_DIR}/assets/html/${filename}.html`)
 					.then(r => {
 						if (r.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${r.status})`); }
 						return r.text();
