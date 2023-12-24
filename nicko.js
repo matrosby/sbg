@@ -56,7 +56,7 @@
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
 	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
-	const LATEST_KNOWN_VERSION = '0.4.2-2';
+	const LATEST_KNOWN_VERSION = '0.4.2-3';
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
@@ -4375,7 +4375,6 @@
 				pointPopup.appendChild(jumpToButton);
 
 				try {
-					if (window.navigator.userAgent.toLowerCase().includes('www')) { throw new Error('Навигационные ссылки не поддерживаются в APK.'); }
 
 					function createURL(app, routeType) {
 						const [lonA, latA] = ol.proj.toLonLat(playerFeature.getGeometry().getCoordinates());
@@ -4393,7 +4392,7 @@
 								url = `dgis://2gis.ru/routeSearch/rsType/${routeType}/from/${lonA},${latA}/to/${lonB},${latB}`;
 								break;
 							case 'gmaps':
-								url = `comgooglemaps://?saddr=${latA},${lonA}&daddr=${latB},${lonB}&directionsmode=${routeType}`;
+								url = `https://www.google.com/maps/dir/?api=1&origin=${latA},${lonA}&destination=${latB},${lonB}&travelmode=${routeType}`;
 								break;
 						}
 
