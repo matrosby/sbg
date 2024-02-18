@@ -590,7 +590,7 @@
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
-				if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
+				if (replacesMade == replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
 				document.head.appendChild(script);
 			})
 			.catch(error => {
