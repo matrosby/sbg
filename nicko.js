@@ -590,8 +590,13 @@
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
-				
+				if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
+				document.head.appendChild(script);
 			})
+			.catch(error => {
+				alert(`SBG CUI: Ошибка при загрузке основного скрипта. ${error.message}`);
+				console.log('SBG CUI: Ошибка при загрузке основного скрипта.', error);
+			});
 	}
 
 
