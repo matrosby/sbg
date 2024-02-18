@@ -582,7 +582,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 25;
+		const replacesShouldBe = 24;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
