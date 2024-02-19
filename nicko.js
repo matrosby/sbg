@@ -504,8 +504,6 @@
 					return `window.Catalysers`;
 				case `const TeamColors`:
 					return `window.TeamColors`;
-				case `if (zoom % 1 != 0)`:
-					return `//${match}`;
 				case `if (getSettings('plrhid') == true) $('.ol-layer__player').addClass('hidden')`:
 					return `${match};}
 									if (!document.querySelector('.info.popup').classList.contains('hidden')) {
@@ -559,7 +557,6 @@
 		const regexp = new RegExp([
 			`(const Catalysers)`,
 			`(const TeamColors)`,
-			`(if \\(zoom % 1 != 0\\))`,
 			`(if \\(getSettings\\('plrhid'\\) == true\\) \\$\\('\\.ol-layer__player'\\)\\.addClass\\('hidden'\\))`,
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
@@ -582,7 +579,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 25;
+		const replacesShouldBe = 24;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
