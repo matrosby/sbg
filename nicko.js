@@ -522,8 +522,6 @@
 					return `${match}return;`;
 				case `$('[name="baselayer"]').on('change', e`:
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
-				case `hour: '2-digit'`:
-					return `${match}, hourCycle: 'h23', second: '2-digit'`;
 				case `function initCompass() {`:
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`:
@@ -564,7 +562,6 @@
 			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
-			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
@@ -579,7 +576,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 24;
+		const replacesShouldBe = 23;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
