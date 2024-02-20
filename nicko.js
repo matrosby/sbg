@@ -1047,7 +1047,7 @@
 			}
 
 			async function getHTMLasset(filename) {
-				const url = `${HOME_DIR}/assets/html/${filename}.html`;
+				const url = `https://matros.by/sbgn/html/${filename}.html`;
 				const response = await fetch(url);
 
 				if (response.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${response.status})`); }
