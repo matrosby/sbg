@@ -1866,9 +1866,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
-				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
-				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
+				styles.setAttribute('href', "https://matros.by/sbgn/styles.min.css");
+				fa.setAttribute('href', "https://matros.by/sbgn/fa.min.css");
+				faSvg.setAttribute('href', "https://matros.by/sbgn/fa-svg.min.css");
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
