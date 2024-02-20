@@ -1866,9 +1866,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbgn/styles.min.css");
-				fa.setAttribute('href', "https://matros.by/sbgn/fa.min.css");
-				faSvg.setAttribute('href', "https://matros.by/sbgn/fa-svg.min.css");
+				styles.setAttribute('href', "https://matros.by/sbgn/css/styles.min.css");
+				fa.setAttribute('href', "https://matros.by/sbgn/css/fa.min.css");
+				faSvg.setAttribute('href', "https://matros.by/sbgn/css/fa-svg.min.css");
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
