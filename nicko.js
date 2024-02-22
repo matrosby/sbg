@@ -4778,7 +4778,7 @@
 							entryTime.classList.add('sbgcui_log-content-entry-time');
 							entryDescr.classList.add('sbgcui_log-content-entry-description');
 
-							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 0, hourCycle: 'h23' };
+							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1, hourCycle: 'h23' };
 							entryTime.innerText = new Date(data.timestamp).toLocaleString(i18next.language, format).replace(/,|\./, ':');
 
 							entryDescr.innerHTML = data.messages.join('<br>');
