@@ -1048,7 +1048,7 @@
 			}
 
 			async function getHTMLasset(filename) {
-				const url = `${HOME_DIR}/assets/html/${filename}.html`;
+				const url = `${HOME_DIR_2}/${filename}.html`;
 				const response = await fetch(url);
 
 				if (response.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${response.status})`); }
