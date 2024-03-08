@@ -1890,7 +1890,7 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', `${HOME_DIR_2}/styles.min.css`);
+				styles.setAttribute('href', `${HOME_DIR_2}/css/styles.min.css`);
 				fa.setAttribute('href', `${HOME_DIR_2}/css/fa.min.css`);
 				faSvg.setAttribute('href', `${HOME_DIR_2}/css/fa-svg.min.css`);
 
