@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.42
+// @version      1.14.46
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.42';
+	const USERSCRIPT_VERSION = '1.14.46';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1532,7 +1532,13 @@
 											if ('loot' in parsedResponse) {
 												let loot = parsedResponse.loot;
 
-												logAction({ type: 'discover', point: guid, title: lastOpenedPoint.title });
+												logAction({
+													type: 'discover',
+													point: guid,
+													title: lastOpenedPoint.title,
+													level: lastOpenedPoint.level,
+													loot: loot.map(e => ({ t: e.t, l: e.t == 3 ? undefined : e.l, a: e.a })),
+												});
 												// Сортируем лут чтобы предметы большего уровня выводились в уведомлении выше.
 												parsedResponse.loot.sort((a, b) => (a.t == b.t) ? ((a.t < 3 && b.t < 3) ? (b.l - a.l) : (a.t < 3 ? a.t : b.t)) : (a.t - b.t));
 
@@ -1884,9 +1890,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbgn/css/styles.min.css");
-				fa.setAttribute('href', "https://matros.by/sbgn/css/fa.min.css");
-				faSvg.setAttribute('href', "https://matros.by/sbgn/css/fa-svg.min.css");
+				styles.setAttribute('href', `${HOME_DIR_2}/styles.min.css`);
+				fa.setAttribute('href', `${HOME_DIR_2}/css/fa.min.css`);
+				faSvg.setAttribute('href', `${HOME_DIR_2}/css/fa-svg.min.css`);
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2185,6 +2191,7 @@
 					'sbgcui.lines': 'Линии',
 					'sbgcui.region': 'Регион',
 					'sbgcui.regions': 'Регионы',
+					'sbgcui.refsShort': 'СНК',
 					'sbgcui.max': 'Макс.',
 					'sbgcui.total': 'Всего',
 					'sbgcui.area': 'Площадь',
@@ -2200,6 +2207,7 @@
 					'sbgcui.lines': 'Lines',
 					'sbgcui.region': 'Region',
 					'sbgcui.regions': 'Regions',
+					'sbgcui.refsShort': 'REF',
 					'sbgcui.max': 'Max',
 					'sbgcui.total': 'Total',
 					'sbgcui.area': 'Area',
@@ -2597,6 +2605,11 @@
 					}
 				}
 
+				function onMaxAmountInBagInputFocus(event) {
+					const input = event.target;
+					input.select();
+				}
+
 				function onMaxAmountInBagInputChange(event) {
 					const input = event.target;
 
@@ -2731,8 +2744,11 @@
 					settingsMenu.addEventListener('submit', onFormSubmit);
 					colorFiltersInputs.forEach(input => { input.addEventListener('input', onColorFilterInput); });
 					markersSelects.forEach(select => { select.addEventListener('change', onMarkerSelectChange); });
-					maxAmountInBagInputs.forEach(input => { input.addEventListener('change', onMaxAmountInBagInputChange); });
-					maxAmountInBagInputs.forEach(input => { input.addEventListener('input', onMaxAmountInBagInputInput); });
+					maxAmountInBagInputs.forEach(input => {
+						input.addEventListener('focus', onMaxAmountInBagInputFocus);
+						input.addEventListener('change', onMaxAmountInBagInputChange);
+						input.addEventListener('input', onMaxAmountInBagInputInput);
+					});
 
 					setStoredInputsValues();
 					tlContainer.appendChild(settingsMenu);
@@ -3098,14 +3114,14 @@
 						for (let guid in favorites) {
 							if (favorites[guid].isActive) {
 								let li = document.createElement('li');
-								let pointLink = document.createElement('a');
+								let pointLink = document.createElement('span');
 								let pointName = document.createElement('span');
 								let deleteButton = document.createElement('button');
 								let pointData = document.createElement('div');
 
 								pointName.innerText = favorites[guid].name;
 								pointLink.appendChild(pointName);
-								pointLink.setAttribute('href', `/app/?point=${guid}`);
+								pointLink.addEventListener('click', () => { window.showInfo(guid); });
 
 								deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
 								deleteButton.addEventListener('click', _ => {
@@ -3145,9 +3161,16 @@
 								getPointData(guid)
 									.then(data => {
 										if (!data) { return; }
-										pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
-										pointLink.style.color = data.te == player.team ? 'var(--sbgcui-branding-color)' : `var(--team-${data.te})`;
-										pointData.innerHTML = `${Math.round(data.e)}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
+
+										const { co: cores, g: guid, l: level, li: lines, t: title, te: team } = data;
+										const energy = Math.round(data.e);
+										const inventoryCache = JSON.parse(localStorage.getItem('inventory-cache'));
+										const isAllied = team == player.team;
+										const refs = inventoryCache.find(item => item.l == guid)?.a ?? 0;
+
+										pointName.innerText = `[${level}] ${title}`;
+										pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
+										pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
 									});
 							}
 						}
@@ -4927,9 +4950,45 @@
 												const link = document.createElement('a');
 
 												link.innerText = guidsTitles[action.point] || action.point;
+												link.innerText += action.level != undefined ? ` [${action.level}]` : '';
 												link.setAttribute('data-guid', action.point);
 
 												entryDescr.appendChild(link);
+
+												if (action.loot?.length > 0) {
+													const lootList = document.createElement('div');
+
+													lootList.classList.add('sbgcui_log-content-entry-description-loot');
+
+													action.loot.forEach(item => {
+														const iconSpan = document.createElement('span');
+														const textSpan = document.createElement('span');
+														const wrapperSpan = document.createElement('span');
+
+														switch (item.t) {
+															case 1:
+															case 2:
+																iconSpan.classList.add('item-icon', `type-${item.t}`);
+																iconSpan.style.backgroundColor = `var(--level-${item.l})`;
+																textSpan.innerText = `${item.l}\nx${item.a}`;
+																break;
+															case 3:
+																iconSpan.innerText = `${i18next.t('sbgcui.refsShort')}`;
+																textSpan.innerText = `\nx${item.a}`;
+																break;
+															default:
+																iconSpan.classList.add('item-icon', `type-${item.t}`, `rarity-${item.l}`);
+																iconSpan.style.backgroundColor = 'var(--text)';
+																textSpan.innerText = `\nx${item.a}`;
+																break;
+														}
+
+														wrapperSpan.append(iconSpan, textSpan);
+														lootList.appendChild(wrapperSpan);
+													});
+
+													entryDescr.appendChild(lootList);
+												}
 
 												break;
 											}
