@@ -50,7 +50,7 @@
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-    const HOME_DIR_2 = 'https://raw.githubusercontent.com/matrosby/sbg/master';
+    const HOME_DIR_2 = 'https://matros.by/sbgn';
 	const INVENTORY_LIMIT = 3000;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const INVIEW_POINTS_DATA_TTL = 7000;
