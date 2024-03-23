@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.47
+// @version      1.14.48
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,14 +43,16 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const ACTIONS_REWARDS = { destroy: { region: 125*2, line: 45*2, core: 10*2 } };
+	//const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
+	const ACTIONS_REWARDS = { destroy: { region: 125 * 2, line: 45 * 2, core: 10 * 2 } };
 	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
+	//const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
 	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 2, 1];
+	//const DISCOVERY_COOLDOWN = 90;
 	const DISCOVERY_COOLDOWN = 45;
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-    const HOME_DIR_2 = 'https://matros.by/sbg';
 	const INVENTORY_LIMIT = 3000;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const INVIEW_POINTS_DATA_TTL = 7000;
@@ -62,7 +64,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.47';
+	const USERSCRIPT_VERSION = '1.14.48';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -107,6 +109,7 @@
 			stateStore.add(null, 'lastUsedCatalyser');
 			stateStore.add(null, 'starModeTarget');
 			stateStore.add(0, 'versionWarns');
+			stateStore.add(false, 'isAutoShowPoints');
 		}
 
 		function updateDB() {
@@ -516,6 +519,7 @@
 					return `constrainResolution: false`;
 				case `movePlayer([coords.longitude, coords.latitude])`: // Line ~353
 					return `${match};
+									window.dispatchEvent(new Event('playerMove'));
 									if (!document.querySelector('.info.popup').classList.contains('hidden')) {
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
@@ -540,6 +544,8 @@
 					return `NickolayV`;
 				case `timers.info_controls = setInterval(() => {`: // Line ~1443
 					return `timers.info_controls = setTimeout(() => {`;
+				case `function update() {`: // Line ~1521
+					return `${match} if (guid !== $('.info').attr('data-guid')) { return; }`;
 				case `delete cooldowns[guid]`: // Line ~1532
 					return `${match}; manageControls();`;
 				case `makeEntry(e, data)`: // Line ~1658
@@ -578,6 +584,7 @@
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
+			`(function update\\(\\) {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
@@ -588,7 +595,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 25;
+		const replacesShouldBe = 26;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -769,6 +776,34 @@
 					}
 
 					click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
+				}
+			}
+
+			class InviewPoint {
+				constructor(pointData) { // Чистый ответ сервера или объект Point.
+					this.cores = pointData.co ?? pointData.coresAmount;
+					this.energy = pointData.e ?? pointData.energy;
+					this.level = pointData.l ?? pointData.level;
+					this.lines = {
+						in: pointData.li?.i ?? pointData.lines.in,
+						out: pointData.li?.o ?? pointData.lines.out,
+					};
+					this.timestamp = Date.now();
+				}
+
+				update(pointData) {
+					this.cores = pointData.co ?? pointData.coresAmount ?? this.cores;
+					this.energy = pointData.e ?? pointData.energy ?? this.energy;
+					this.level = pointData.l ?? pointData.level ?? this.level;
+					this.lines = {
+						in: pointData.li?.i ?? pointData.lines?.in ?? this.lines.in,
+						in: pointData.li?.o ?? pointData.lines?.out ?? this.lines.out,
+					};
+					this.timestamp = Date.now();
+				}
+
+				get linesAmount() {
+					return this.lines.in + this.lines.out;
 				}
 			}
 
@@ -969,6 +1004,7 @@
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 			let isRefsViewerOpened = false;
+			let isClusterOverlayOpened = false;
 			let isInvClearInProgress = false;
 
 			let lastOpenedPoint = {};
@@ -1067,7 +1103,7 @@
 			}
 
 			async function clearInventory(isForceClear = false, loot = []) {
-				if (isInvClearInProgress) { return; } else { isInvClearInProgress = true; }
+				if (isInvClearInProgress) { return []; } else { isInvClearInProgress = true; }
 
 				const maxAmountInBag = config.maxAmountInBag;
 				const toDelete = {};
@@ -1081,7 +1117,7 @@
 					const deletedAmounts = {};
 					let pointsData = [], pointsTeams = {}, invTotal = Infinity, message = '';
 
-					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return; }
+					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return []; }
 
 					if (!isEnoughSpace || isForceClear) {
 						const isDeleteAll = allied == 0 && hostile == 0;
@@ -1148,7 +1184,7 @@
 						}
 					});
 
-					if (Object.keys(toDelete).length == 0) { return; }
+					if (Object.keys(toDelete).length == 0) { return []; }
 
 					for (let type in toDelete) {
 						const entries = Object.entries(toDelete[type]);
@@ -1484,19 +1520,35 @@
 									switch (url.pathname) {
 										case '/api/point':
 											if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
-												lastOpenedPoint = new Point(parsedResponse.data);
+												const pointData = parsedResponse.data;
+												const guid = pointData.g;
+
+												lastOpenedPoint = new Point(pointData);
+
+												if (inview[guid] == undefined) {
+													if (lastOpenedPoint.coresAmount > 0) { inview[guid] = new InviewPoint(lastOpenedPoint); }
+												} else {
+													inview[guid].update(lastOpenedPoint);
+												}
 											}
 											break;
 										case '/api/deploy':
 											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
-												const { coords, guid: point, title, isCaptured } = lastOpenedPoint;
-												const isFirstCore = parsedResponse.data.co.length == 1;
+												const { co: cores, e: energy, l: level } = parsedResponse.data;
+												const { coords, guid, title, isCaptured } = lastOpenedPoint;
+												const isFirstCore = cores.length == 1;
 												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
-												lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
+												lastOpenedPoint.update(cores, level);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
-												logAction({ type: actionType, coords, point, title });
+												logAction({ type: actionType, coords, point: guid, title });
+
+												if (inview[guid] == undefined) {
+													inview[guid] = new InviewPoint(lastOpenedPoint);
+												} else {
+													inview[guid].update(lastOpenedPoint);
+												}
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 												const { coords, guid: point, title } = lastOpenedPoint;
 
@@ -1511,20 +1563,25 @@
 											database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
 
 											if ('c' in parsedResponse) {
-												const points = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
+												const destroyedPoints = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
 
-												if (points.length > 0) {
+												if (destroyedPoints.length > 0) {
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
-													logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions, xp });
+
+													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, xp });
+													destroyedPoints.forEach(point => {
+														const guid = point.guid;
+														delete inview[guid];
+													});
 												}
 											}
 
 											break;
 										case '/api/discover':
-											//const guid = JSON.parse(options.body).guid;
-											const guid = lastOpenedPoint.guid;
+											const guid = JSON.parse(options.body).guid;
+											//const guid = lastOpenedPoint.guid;
 
 											// Закрываем тост о том, что избранная точка остыла.
 											if (guid in favorites) { favorites[guid].hideCooldownNotifToast(); }
@@ -1629,17 +1686,7 @@
 
 														getPointData(guid)
 															.then(data => {
-																inview[guid] = {
-																	cores: data.co,
-																	lines: {
-																		in: data.li.i,
-																		out: data.li.o,
-																		get sum() { return this.in + this.out; },
-																	},
-																	energy: data.e,
-																	level: data.l,
-																	timestamp: Date.now()
-																};
+																inview[guid] = new InviewPoint(data);
 															})
 															.catch(() => { inview[guid] = { timestamp: Date.now() }; });
 													});
@@ -1814,6 +1861,18 @@
 					const message = i18next.t('sbgcui.clearTilesCacheConfirm', { amount, size, baselayers: baselayers.size });
 					confirm(message) && tilesStore.clear();
 				});
+			}
+
+			function isAnyPopupOrOverlayOpened() {
+				return (
+					isAttackSliderOpened ||
+					isClusterOverlayOpened ||
+					isDrawSliderOpened ||
+					isInventoryPopupOpened ||
+					isPointPopupOpened ||
+					isProfilePopupOpened ||
+					isRefsViewerOpened
+				);
 			}
 
 
@@ -3543,7 +3602,7 @@
 								let level = inview[this.id_]?.level;
 								return typeof level == 'number' ? String(level) : null;
 							case 'lines':
-								let lines = inview[this.id_]?.lines.sum;
+								let lines = inview[this.id_]?.linesAmount;
 								return lines > 0 ? String(lines) : null;
 							case 'refsAmount':
 								let amount = this.cachedRefsAmounts[this.id_];
@@ -3750,23 +3809,26 @@
 				const originalOnClick = map.getListeners('click')[0];
 				const overlayTransitionsTime = 200;
 				let featuresAtPixel;
-				let isOverlayActive = false;
 				let lastShownCluster = [];
 				let mapClickEvent;
 				let cooldownProgressBarIntervals = [];
 
 				function featureClickHandler(event) {
-					if (!isOverlayActive) { return; }
+					if (!isClusterOverlayOpened) { return; }
 
 					const chosenFeatureGuid = event.target.getAttribute('sbgcui_guid');
 					const chosenFeature = featuresAtPixel.find(feature => feature.getId() == chosenFeatureGuid);
 
-					chosenFeature.set('sbgcui_chosenFeature', true, true);
+					// ЗАМЕНЕНО НА window.showInfo
+					//chosenFeature.set('sbgcui_chosenFeature', true, true);
 
 					hideOverlay();
 					setTimeout(() => {
+						/* ЗАМЕНЕНО НА window.showInfo
 						mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
 						originalOnClick(mapClickEvent);
+						*/
+						window.showInfo(chosenFeature.getId());
 					}, overlayTransitionsTime);
 				}
 
@@ -3776,7 +3838,7 @@
 					setTimeout(() => {
 						overlay.classList.add('sbgcui_hidden');
 						cooldownProgressBarIntervals.forEach(intervalID => { clearInterval(intervalID); });
-						isOverlayActive = false;
+						isClusterOverlayOpened = false;
 					}, overlayTransitionsTime);
 				}
 
@@ -3823,7 +3885,7 @@
 					overlay.classList.remove('sbgcui_hidden');
 					setTimeout(() => {
 						overlay.classList.add('sbgcui_cluster-overlay-blur');
-						isOverlayActive = true;
+						isClusterOverlayOpened = true;
 					}, 10);
 					cooldownProgressBarIntervals = [];
 				}
@@ -3989,11 +4051,24 @@
 			}
 
 
-			/* Переключение между точками */
+			/* Переключение между точками и автооткрытие */
 			{
 				const arrow = document.createElement('i');
 				const shownPoints = new Set();
 				let touchMoveCoords = [];
+
+				function hasFreeSlots(point) {
+					const guid = point.getId();
+					return inview[guid] == undefined || inview[guid].cores < 6;
+				}
+
+				function isDiscoverable(point) {
+					const guid = point.getId();
+					const now = Date.now();
+					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid];
+
+					return cooldown?.t == undefined || (cooldown.t <= now && cooldown.c > 0);
+				}
 
 				function isPointInRange(point) {
 					const playerCoords = playerFeature.getGeometry().getCoordinates();
@@ -4019,13 +4094,58 @@
 					return pointsInRange;
 				}
 
+				function keydownHandler(event) {
+					event.code == 'KeyN' && showNextPointInRange();
+				}
+
 				function pointPopupCloseHandler() {
-					playerFeature.un('change', toggleArrowVisibility);
+					window.removeEventListener('playerMove', toggleArrowVisibility);
 				}
 
 				function pointPopupOpenHandler() {
 					toggleArrowVisibility();
-					playerFeature.on('change', toggleArrowVisibility);
+					window.addEventListener('playerMove', toggleArrowVisibility);
+				}
+
+				function checkPopupsAndShowPoint() {
+					!isAnyPopupOrOverlayOpened() && showNextPointInRange(true);
+				}
+
+				function showNextPointInRange(isAutoShow) {
+					const pointsInRange = getPointsInRange();
+					if (lastOpenedPoint.guid != undefined) { shownPoints.add(lastOpenedPoint.guid); }
+
+					const isEveryPointInRangeShown = pointsInRange.every(point => shownPoints.has(point.getId()));
+					const isNoOnePointInRangeShown = pointsInRange.every(point => !shownPoints.has(point.getId()));
+
+					if (isEveryPointInRangeShown) {
+						if (isAutoShow) { return; }
+						shownPoints.clear();
+					} else if (isNoOnePointInRangeShown) {
+						shownPoints.clear();
+					}
+
+					const suitablePoints = pointsInRange.filter(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
+					const nextPoint = suitablePoints.find(hasFreeSlots) ?? suitablePoints.find(isDiscoverable) ?? suitablePoints[0];
+
+					if (nextPoint == undefined) { return; }
+
+					shownPoints.add(nextPoint.getId());
+
+					/* ЗАМЕНЕНО НА window.showInfo
+					const fakeEvent = {};
+
+					fakeEvent.type = 'click';
+					fakeEvent.pixel = map.getPixelFromCoordinate(nextPoint.getGeometry().getCoordinates());
+					fakeEvent.originalEvent = {};
+					fakeEvent.isSilent = true; // Такой эвент будет проигнорирован функцией показа ромашки для кластера.
+
+					nextPoint.set('sbgcui_chosenFeature', true, true);
+					pointPopup.classList.add('hidden');
+					map.dispatchEvent(fakeEvent);
+					*/
+					pointPopup.classList.add('hidden');
+					window.showInfo(nextPoint.getId());
 				}
 
 				function toggleArrowVisibility() {
@@ -4034,6 +4154,13 @@
 					} else {
 						arrow.classList.add('sbgcui_hidden');
 					}
+				}
+
+				function toggleAutoShowPoints() {
+					state.isAutoShowPoints = !state.isAutoShowPoints;
+					database.transaction('state', 'readwrite').objectStore('state').put(state.isAutoShowPoints, 'isAutoShowPoints');
+					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+					showToast(`${state.isAutoShowPoints ? 'В' : 'От'}ключено открытие точки при приближении к ней.`);
 				}
 
 				function touchEndHandler() {
@@ -4048,36 +4175,11 @@
 					const maxX = Math.max(...xCoords);
 					const minY = Math.min(...yCoords);
 					const maxY = Math.max(...yCoords);
+
 					if (maxY - minY > 70) { return; }
 					if (maxX - minX < 50) { return; }
 
-
-					let pointsInRange = getPointsInRange();
-					shownPoints.add(lastOpenedPoint.guid);
-
-					if (
-						pointsInRange.every(point => shownPoints.has(point.getId())) ||
-						pointsInRange.every(point => !shownPoints.has(point.getId()))
-					) {
-						shownPoints.clear();
-					}
-					const nextPoint = pointsInRange.find(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
-
-					if (nextPoint == undefined) { return; }
-
-					shownPoints.add(nextPoint.getId());
-
-
-					const fakeEvent = {};
-
-					fakeEvent.type = 'click';
-					fakeEvent.pixel = map.getPixelFromCoordinate(nextPoint.getGeometry().getCoordinates());
-					fakeEvent.originalEvent = {};
-					fakeEvent.isSilent = true; // Такой эвент будет проигнорирован функцией показа ромашки для кластера.
-
-					nextPoint.set('sbgcui_chosenFeature', true, true);
-					pointPopup.classList.add('hidden');
-					map.dispatchEvent(fakeEvent);
+					showNextPointInRange();
 				}
 
 				function touchMoveHandler(event) {
@@ -4095,16 +4197,40 @@
 					}
 				}
 
+				function turnAutoShowPointsOff() {
+					autoShowPointsButton.style.opacity = 0.5;
+					autoShowPointsButton.classList.remove('fa-fade');
+					window.removeEventListener('playerMove', checkPopupsAndShowPoint);
+				}
+
+				function turnAutoShowPointsOn() {
+					autoShowPointsButton.style.opacity = 1;
+					autoShowPointsButton.classList.add('fa-fade');
+					window.addEventListener('playerMove', checkPopupsAndShowPoint);
+				}
+
 				arrow.classList.add('sbgcui_swipe-cards-arrow', 'fa', 'fa-solid-angles-left');
 				document.querySelector('.i-stat').appendChild(arrow);
 
 				pointPopup.addEventListener('pointPopupOpened', pointPopupOpenHandler);
 				pointPopup.addEventListener('pointPopupClosed', pointPopupCloseHandler);
 
-
 				pointPopup.addEventListener('touchstart', touchStartHandler);
 				pointPopup.addEventListener('touchmove', touchMoveHandler);
 				pointPopup.addEventListener('touchend', touchEndHandler);
+
+				document.addEventListener('keydown', keydownHandler);
+
+				if (player.name == 'NickolayV') {
+					//const autoShowPointsButton = document.createElement('button');
+					var autoShowPointsButton = document.createElement('button');
+
+					autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
+					autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
+					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+
+					toolbar.addItem(autoShowPointsButton, 7);
+				}
 			}
 
 
