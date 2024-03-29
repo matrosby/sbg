@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.49
+// @version      1.14.50
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.49';
+	const USERSCRIPT_VERSION = '1.14.50';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -268,19 +268,14 @@
 			}
 		}
 
-		function checkStorageSize(event) {
-			const tiles = event.target.result;
-			const tilesAmount = tiles.length;
-			const tilesSize = tiles.reduce((acc, tile) => acc + tile.size, 0);
+		function checkStorageSize() {
+			if (typeof navigator.storage?.estimate != 'function') { return; }
+			
 			const formatter = bytes => bytes >= 1024 ** 3 ? `${+(bytes / 1024 ** 3).toFixed(2)} GB` : `${+(bytes / 1024 ** 2).toFixed(1)} MB`;
 
-			if (typeof navigator.storage?.estimate == 'function') {
-				navigator.storage.estimate().then(({ quota, usage }) => {
-					console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`, `\nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
-				});
-			} else {
-				console.log(`Map cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
-			}
+			navigator.storage.estimate().then(({ quota, usage }) => {
+				console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`);
+			});
 		}
 
 		if (database == undefined) { database = event.target.result; }
@@ -301,7 +296,8 @@
 		const stateRequest = transaction.objectStore('state').openCursor();
 		//const tilesRequest = transaction.objectStore('tiles').getAll();
 		[configRequest, favoritesRequest, stateRequest].forEach(request => { request.addEventListener('success', getData); });
-		//tilesRequest.addEventListener('success', checkStorageSize);
+
+		checkStorageSize();
 	});
 	openRequest.addEventListener('error', event => {
 		console.log('SBG CUI: Ошибка открытия базы данных', event.target.error);
@@ -1922,7 +1918,7 @@
 				cssVars.innerHTML = (`
       		:root {
       		  --sbgcui-player-exp-percentage: ${player.exp.percentage}%;
-      		  --sbgcui-inventory-limit: " / ${INVENTORY_LIMIT}";
+      		  --sbgcui-inventory-limit: "${INVENTORY_LIMIT}";
       		  --sbgcui-invert: ${mapFilters.invert};
       		  --sbgcui-hueRotate: ${mapFilters.hueRotate}deg;
       		  --sbgcui-brightness: ${mapFilters.brightness};
@@ -1946,9 +1942,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.min.css");
+				styles.setAttribute('href', "https://matros.by/sbg/css/styles.min.css);
 				fa.setAttribute('href', "https://matros.by/sbg/css/fa.min.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.min.css");
+				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.min.css);
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2222,7 +2218,7 @@
 
 				blContainer.appendChild(ops);
 
-				ops.replaceChildren('INVENTORY', invTotalSpan);
+				ops.replaceChildren(invTotalSpan);
 
 				selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
 
@@ -5011,11 +5007,15 @@
 						const request = logsStore.getAll(keyRange);
 
 						logContent.innerHTML = '';
+						logContent.setAttribute('data-searchInProgress', '');
 						tagsWrapper.dataset.totalentries = 0;
 
 						request.addEventListener('success', event => {
 							const logs = event.target.result;
-							if (logs.length == 0) { return; }
+							if (logs.length == 0) {
+								logContent.removeAttribute('data-searchInProgress');
+								return;
+							}
 
 							const guidsTitles = {};
 							const pointsWithoutTitle = [];
@@ -5047,6 +5047,7 @@
 							const promises = pointsWithoutTitle.map(guid => getPointData(guid));
 							Promise.all(promises)
 								.then(results => {
+									logContent.removeAttribute('data-searchInProgress');
 									results.forEach(point => { guidsTitles[point.g] = point.t; });
 									logs.forEach(action => {
 										const entry = document.createElement('p');
@@ -5193,8 +5194,12 @@
 										logContent.appendChild(entry);
 									});
 								})
-								.catch(error => { console.log('SBG CUI: Ошибка при получении данных точек (логи).', error); });
+								.catch(error => {
+									console.log('SBG CUI: Ошибка при получении данных точек (логи).', error);
+									logContent.removeAttribute('data-searchInProgress');
+								});
 						});
+						request.addEventListener('error', () => { logContent.removeAttribute('data-searchInProgress'); });
 					}
 
 					function showPointInfo(event) {
