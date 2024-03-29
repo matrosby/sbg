@@ -50,7 +50,6 @@
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	const HOME_DIR_2 = 'https://raw.githubusercontent.com/matrosby/sbg/master';
 	const INVENTORY_LIMIT = 3000;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const INVIEW_POINTS_DATA_TTL = 7000;
@@ -1087,7 +1086,7 @@
 			}
 
 			async function getHTMLasset(filename) {
-				const url = `${HOME_DIR_2}/html/${filename}.html`;
+				const url = `${HOME_DIR}/assets/html/${filename}.html`;
 				const response = await fetch(url);
 
 				if (response.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${response.status})`); }
