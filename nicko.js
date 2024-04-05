@@ -1,17 +1,3 @@
-// ==UserScript==
-// @name         SBG CUI
-// @namespace    https://sbg-game.ru/app/
-// @version      1.14.50
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
-// @description  SBG Custom UI
-// @author       NV
-// @match        https://sbg-game.ru/app/*
-// @run-at       document-idle
-// @grant        none
-// @iconURL      https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
-// ==/UserScript==
-
 (function () {
 	'use strict';
 
@@ -2287,14 +2273,15 @@
 				});
 
 				window.attack_slider.options = {
-					speed: 200,
+					//speed: 200,
 				};
 				window.deploy_slider.options = {
-					speed: 200,
+					//speed: 200,
 				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
+					//speed: 200,
 					//perPage: 2,
 				};
 
