@@ -1943,8 +1943,8 @@
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
 				styles.setAttribute('href', "https://matros.by/sbg/css/styles.min.css");
-				fa.setAttribute('href', "https://matros.by/sbg/css/fa.min.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.min.css");
+				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
+				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
