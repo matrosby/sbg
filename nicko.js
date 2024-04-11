@@ -1942,7 +1942,7 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.min.css");
+				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
 				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
 				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
 
