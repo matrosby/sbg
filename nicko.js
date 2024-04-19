@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.51
+// @version      1.14.52
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,6 @@
 	if (window.location.pathname.startsWith('/login')) { return; }
 	if (document.querySelector('[src="intel.js"]')) { return; }
 
-	window.cuiStatus = 'loading';
 	window.stop();
 	document.open();
 	if (/firefox/i.test(window.navigator.userAgent) == false) {
@@ -61,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.51';
+	const USERSCRIPT_VERSION = '1.14.52';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -957,6 +956,7 @@
 			const attackButton = document.querySelector('#attack-menu');
 			const attackSlider = document.querySelector('.attack-slider-wrp');
 			const blContainer = document.querySelector('.bottom-container');
+			const drawButton = document.querySelector('#draw');
 			const drawSlider = document.querySelector('.draw-slider-wrp');
 			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const catalysersList = document.querySelector('#catalysers-list');
@@ -1044,6 +1044,16 @@
 				const parsedResponse = await response.json();
 
 				return parsedResponse.data;
+			}
+
+			async function getPossibleLines(pointGuid, pointCoords) {
+				const isExref = JSON.parse(localStorage.getItem('settings')).exref ?? false;
+				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}`;
+				const options = { headers, method: 'GET' };
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+
+				return parsedResponse.data ?? [];
 			}
 
 			async function getInventory() {
@@ -1518,6 +1528,13 @@
 
 												lastOpenedPoint = new Point(pointData);
 
+												drawButton.removeAttribute('sbgcui-possible-lines');
+												if (lastOpenedPoint.team == player.team) {
+													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
+														if (lines.length > 0) { drawButton.setAttribute('sbgcui-possible-lines', lines.length); }
+													});
+												}
+
 												if (inview[guid] == undefined) {
 													if (lastOpenedPoint.coresAmount > 0) { inview[guid] = new InviewPoint(lastOpenedPoint); }
 												} else {
@@ -1809,25 +1826,27 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
-					// Некоторые ответы сервера и некоторые локальные строки имеют точку в конце.
-					// В виду отсутствия единой схемы удаляем точку везде.
-					const text = options.text.replace(/\.$/, '');
-					const outOfRange = i18next.t('popups.point.range').replace(/\.$/, '');
-					const networkFail = i18next.t('popups.network-fail').replace(/\.$/, '');
-					const linesNone = i18next.t('popups.lines-none').replace(/\.$/, '');
+					if (options.text != undefined) {
+						// Некоторые ответы сервера и некоторые локальные строки имеют точку в конце.
+						// В виду отсутствия единой схемы удаляем точку везде.
+						const text = options.text.replace(/\.$/, '');
+						const outOfRange = i18next.t('popups.point.range').replace(/\.$/, '');
+						const networkFail = i18next.t('popups.network-fail').replace(/\.$/, '');
+						const linesNone = i18next.t('popups.lines-none').replace(/\.$/, '');
 
-					switch (text) {
-						case outOfRange:
-							options.gravity = 'top';
-							options.position = 'right';
-							break;
-						case networkFail:
-							options.gravity = 'top';
-							options.position = 'center';
-							break;
-						case linesNone:
-							options.className = 'error-toast';
-							break;
+						switch (text) {
+							case outOfRange:
+								options.gravity = 'top';
+								options.position = 'right';
+								break;
+							case networkFail:
+								options.gravity = 'top';
+								options.position = 'center';
+								break;
+							case linesNone:
+								options.className = 'error-toast';
+								break;
+						}
 					}
 
 					if (options.className?.startsWith('sbgcui_') == false) { options.selector = null; }
@@ -2287,15 +2306,15 @@
 				});
 
 				window.attack_slider.options = {
-					//speed: 200,
+					speed: 200,
 				};
 				window.deploy_slider.options = {
-					//speed: 200,
+					speed: 200,
 				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
-					//speed: 200,
+					speed: 200,
 					//perPage: 2,
 				};
 
@@ -2469,6 +2488,7 @@
 						e.style.setProperty('--sbgcui-energy', `${data.e}%`);
 						if (data.e < 100) {
 							e.style.setProperty('--sbgcui-display-r-button', 'flex');
+							e.setAttribute('sbgcui-repairable', '');
 						}
 					}
 
@@ -2516,6 +2536,20 @@
 						});
 				}
 
+				function keyupHandler(event) {
+					if (event.code != 'KeyR') { return; }
+
+					const refEntry = document.querySelector('.inventory__item[sbgcui-repairable]');
+					const pointGuid = refEntry?.dataset.ref;
+
+					if (refEntry == null) { return; }
+
+					recursiveRepair(pointGuid, refEntry);
+					refEntry.scrollIntoView();
+					refEntry.removeAttribute('sbgcui-repairable');
+					refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
+				}
+
 				window.makeEntryDec = makeEntryDec;
 
 				inventoryContent.addEventListener('click', event => {
@@ -2536,6 +2570,9 @@
 
 					recursiveRepair(pointGuid, refEntry);
 				});
+
+				inventoryPopup.addEventListener('inventoryPopupOpened', () => { document.addEventListener('keyup', keyupHandler); });
+				inventoryPopup.addEventListener('inventoryPopupClosed', () => { document.removeEventListener('keyup', keyupHandler); });
 			}
 
 
@@ -4235,16 +4272,13 @@
 
 				document.addEventListener('keydown', keydownHandler);
 
-				if (player.name == 'NickolayV') {
-					//const autoShowPointsButton = document.createElement('button');
-					var autoShowPointsButton = document.createElement('button');
+				const autoShowPointsButton = document.createElement('button');
 
-					autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
-					autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
-					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+				autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
+				autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
+				state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
 
-					toolbar.addItem(autoShowPointsButton, 7);
-				}
+				toolbar.addItem(autoShowPointsButton, 7);
 			}
 
 
@@ -5419,8 +5453,6 @@
 
 				manageAmountButtons.before(wrapper);
 			}
-
-			window.cuiStatus = 'loaded';
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
 		}
