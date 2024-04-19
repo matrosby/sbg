@@ -1530,9 +1530,13 @@
 												lastOpenedPoint = new Point(pointData);
 
 												drawButton.removeAttribute('sbgcui-possible-lines');
+												drawButton.removeAttribute('sbgcui-nopossible-lines');
+
 												if (lastOpenedPoint.team == player.team) {
 													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
-														if (lines.length > 0) { drawButton.setAttribute('sbgcui-possible-lines', lines.length); } 
+														if (lines.length > 0) { drawButton.setAttribute('sbgcui-possible-lines', lines.length); } else {
+			drawButton.setAttribute('sbgcui-nopossible-lines', lines.length); 
+												}
 													});
 												}
 
