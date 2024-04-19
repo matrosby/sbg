@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.52
+// @version      1.14.54
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,8 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.52';
+	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
+	const USERSCRIPT_VERSION = '1.14.54';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -644,7 +645,7 @@
 				}
 
 				get emptySlots() {
-					return 6 - Object.keys(this.cores);
+					return 6 - Object.keys(this.cores).length;
 				}
 
 				get isEmptySlots() {
@@ -1381,11 +1382,13 @@
 						break;
 					case 'point_level':
 						color = getComputedStyle(pointLevelSpan).color;
+						pointPopup.style.background = config.ui.pointBgImage ? `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)` : '';
 						pointPopup.style.borderColor = color;
 						pointTitleSpan.style.color = color;
 						break;
 					case 'point_team':
 						color = getComputedStyle(pointOwnerSpan).color;
+						pointPopup.style.background = config.ui.pointBgImage ? `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)` : '';
 						pointPopup.style.borderColor = color;
 						pointTitleSpan.style.color = color;
 						break;
@@ -1430,6 +1433,11 @@
 			function toOLMeters(meters, rate) {
 				rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, view.getCenter(), 'm');
 				return meters * rate;
+			}
+
+			function getDistance(to, from = playerFeature.getGeometry().getCoordinates()) {
+				const line = new ol.geom.LineString([from, ol.proj.fromLonLat(to)]);
+				return ol.sphere.getLength(line);
 			}
 
 			function calcPlayingTime(regDateString) {
@@ -1530,13 +1538,9 @@
 												lastOpenedPoint = new Point(pointData);
 
 												drawButton.removeAttribute('sbgcui-possible-lines');
-												drawButton.removeAttribute('sbgcui-nopossible-lines');
-
-												if (lastOpenedPoint.team == player.team) {
+												if (lastOpenedPoint.team == player.team && getDistance(lastOpenedPoint.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT) {
 													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
-														if (lines.length > 0) { drawButton.setAttribute('sbgcui-possible-lines', lines.length); } else {
-			drawButton.setAttribute('sbgcui-nopossible-lines', lines.length); 
-												}
+														drawButton.setAttribute('sbgcui-possible-lines', lines.length);
 													});
 												}
 
@@ -1556,6 +1560,12 @@
 
 												lastOpenedPoint.update(cores, level);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
+
+												if (lastOpenedPoint.isEmptySlots == false) {
+													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
+														drawButton.setAttribute('sbgcui-possible-lines', lines.length);
+													});
+												}
 
 												logAction({ type: actionType, coords, point: guid, title });
 
@@ -4127,11 +4137,8 @@
 				}
 
 				function isPointInRange(point) {
-					const playerCoords = playerFeature.getGeometry().getCoordinates();
-					const pointCoords = point.getGeometry().getCoordinates();
-					const distanceToPlayer = Math.sqrt(Math.pow(pointCoords[0] - playerCoords[0], 2) + Math.pow(pointCoords[1] - playerCoords[1], 2));
-
-					return distanceToPlayer < toOLMeters(PLAYER_RANGE);
+					const pointCoords = ol.proj.toLonLat(point.getGeometry().getCoordinates());
+					return getDistance(pointCoords) < PLAYER_RANGE;
 				}
 
 				function getPointsInRange() {
@@ -5458,7 +5465,6 @@
 
 				manageAmountButtons.before(wrapper);
 			}
-
 			window.cuiStatus = 'loaded';
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
