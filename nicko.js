@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.54
+// @version      1.14.49
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,8 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.54';
+	const USERSCRIPT_VERSION = '1.14.49';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -269,14 +268,19 @@
 			}
 		}
 
-		function checkStorageSize() {
-			if (typeof navigator.storage?.estimate != 'function') { return; }
-
+		function checkStorageSize(event) {
+			const tiles = event.target.result;
+			const tilesAmount = tiles.length;
+			const tilesSize = tiles.reduce((acc, tile) => acc + tile.size, 0);
 			const formatter = bytes => bytes >= 1024 ** 3 ? `${+(bytes / 1024 ** 3).toFixed(2)} GB` : `${+(bytes / 1024 ** 2).toFixed(1)} MB`;
 
-			navigator.storage.estimate().then(({ quota, usage }) => {
-				console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`);
-			});
+			if (typeof navigator.storage?.estimate == 'function') {
+				navigator.storage.estimate().then(({ quota, usage }) => {
+					console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`, `\nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
+				});
+			} else {
+				console.log(`Map cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
+			}
 		}
 
 		if (database == undefined) { database = event.target.result; }
@@ -297,8 +301,7 @@
 		const stateRequest = transaction.objectStore('state').openCursor();
 		//const tilesRequest = transaction.objectStore('tiles').getAll();
 		[configRequest, favoritesRequest, stateRequest].forEach(request => { request.addEventListener('success', getData); });
-
-		checkStorageSize();
+		//tilesRequest.addEventListener('success', checkStorageSize);
 	});
 	openRequest.addEventListener('error', event => {
 		console.log('SBG CUI: Ошибка открытия базы данных', event.target.error);
@@ -310,7 +313,7 @@
 			.then(r => r.text())
 			.then(data => {
 				data = data.replace(/<script class="mobile-check">.+?<\/script>/, '');
-				data = data.replace(/(<script src="\/packages\/js\/ol\.js")(>)/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
+				data = data.replace(/(<script src="https:\/\/cdn.jsdelivr.net\/npm\/ol@.+?)(>)/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
 
 				document.write(data);
 				document.close();
@@ -645,7 +648,7 @@
 				}
 
 				get emptySlots() {
-					return 6 - Object.keys(this.cores).length;
+					return 6 - Object.keys(this.cores);
 				}
 
 				get isEmptySlots() {
@@ -958,7 +961,6 @@
 			const attackButton = document.querySelector('#attack-menu');
 			const attackSlider = document.querySelector('.attack-slider-wrp');
 			const blContainer = document.querySelector('.bottom-container');
-			const drawButton = document.querySelector('#draw');
 			const drawSlider = document.querySelector('.draw-slider-wrp');
 			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const catalysersList = document.querySelector('#catalysers-list');
@@ -1046,16 +1048,6 @@
 				const parsedResponse = await response.json();
 
 				return parsedResponse.data;
-			}
-
-			async function getPossibleLines(pointGuid, pointCoords) {
-				const isExref = JSON.parse(localStorage.getItem('settings')).exref ?? false;
-				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}`;
-				const options = { headers, method: 'GET' };
-				const response = await fetch(url, options);
-				const parsedResponse = await response.json();
-
-				return parsedResponse.data ?? [];
 			}
 
 			async function getInventory() {
@@ -1382,13 +1374,11 @@
 						break;
 					case 'point_level':
 						color = getComputedStyle(pointLevelSpan).color;
-						pointPopup.style.background = config.ui.pointBgImage ? `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)` : '';
 						pointPopup.style.borderColor = color;
 						pointTitleSpan.style.color = color;
 						break;
 					case 'point_team':
 						color = getComputedStyle(pointOwnerSpan).color;
-						pointPopup.style.background = config.ui.pointBgImage ? `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)` : '';
 						pointPopup.style.borderColor = color;
 						pointTitleSpan.style.color = color;
 						break;
@@ -1433,11 +1423,6 @@
 			function toOLMeters(meters, rate) {
 				rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, view.getCenter(), 'm');
 				return meters * rate;
-			}
-
-			function getDistance(to, from = playerFeature.getGeometry().getCoordinates()) {
-				const line = new ol.geom.LineString([from, ol.proj.fromLonLat(to)]);
-				return ol.sphere.getLength(line);
 			}
 
 			function calcPlayingTime(regDateString) {
@@ -1537,13 +1522,6 @@
 
 												lastOpenedPoint = new Point(pointData);
 
-												drawButton.removeAttribute('sbgcui-possible-lines');
-												if (lastOpenedPoint.team == player.team && getDistance(lastOpenedPoint.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT) {
-													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
-														drawButton.setAttribute('sbgcui-possible-lines', lines.length);
-													});
-												}
-
 												if (inview[guid] == undefined) {
 													if (lastOpenedPoint.coresAmount > 0) { inview[guid] = new InviewPoint(lastOpenedPoint); }
 												} else {
@@ -1560,12 +1538,6 @@
 
 												lastOpenedPoint.update(cores, level);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
-
-												if (lastOpenedPoint.isEmptySlots == false) {
-													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
-														drawButton.setAttribute('sbgcui-possible-lines', lines.length);
-													});
-												}
 
 												logAction({ type: actionType, coords, point: guid, title });
 
@@ -1841,27 +1813,11 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
-					if (options.text != undefined) {
-						// Некоторые ответы сервера и некоторые локальные строки имеют точку в конце.
-						// В виду отсутствия единой схемы удаляем точку везде.
-						const text = options.text.replace(/\.$/, '');
-						const outOfRange = i18next.t('popups.point.range').replace(/\.$/, '');
-						const networkFail = i18next.t('popups.network-fail').replace(/\.$/, '');
-						const linesNone = i18next.t('popups.lines-none').replace(/\.$/, '');
-
-						switch (text) {
-							case outOfRange:
-								options.gravity = 'top';
-								options.position = 'right';
-								break;
-							case networkFail:
-								options.gravity = 'top';
-								options.position = 'center';
-								break;
-							case linesNone:
-								options.className = 'error-toast';
-								break;
-						}
+					if (i18next.t('popups.point.range').includes(options.text)) {
+						options.gravity = 'top';
+						options.position = 'right';
+					} else if (i18next.t('popups.lines-none').includes(options.text)) {
+						options.className = 'error-toast';
 					}
 
 					if (options.className?.startsWith('sbgcui_') == false) { options.selector = null; }
@@ -1966,7 +1922,7 @@
 				cssVars.innerHTML = (`
       		:root {
       		  --sbgcui-player-exp-percentage: ${player.exp.percentage}%;
-      		  --sbgcui-inventory-limit: "${INVENTORY_LIMIT}";
+      		  --sbgcui-inventory-limit: " / ${INVENTORY_LIMIT}";
       		  --sbgcui-invert: ${mapFilters.invert};
       		  --sbgcui-hueRotate: ${mapFilters.hueRotate}deg;
       		  --sbgcui-brightness: ${mapFilters.brightness};
@@ -1990,9 +1946,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
-				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
+				styles.setAttribute('href', "https://matros.by/sbg/css/styles.min.css");
+				fa.setAttribute('href', "https://matros.by/sbg/css/fa.min.css");
+				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.min.css");
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2266,7 +2222,7 @@
 
 				blContainer.appendChild(ops);
 
-				ops.replaceChildren(invTotalSpan);
+				ops.replaceChildren('INVENTORY', invTotalSpan);
 
 				selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
 
@@ -2320,16 +2276,9 @@
 					'items.core-short': '{{level}}',
 				});
 
-				window.attack_slider.options = {
-					speed: 200,
-				};
-				window.deploy_slider.options = {
-					speed: 200,
-				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
-					speed: 200,
 					//perPage: 2,
 				};
 
@@ -2503,7 +2452,6 @@
 						e.style.setProperty('--sbgcui-energy', `${data.e}%`);
 						if (data.e < 100) {
 							e.style.setProperty('--sbgcui-display-r-button', 'flex');
-							e.setAttribute('sbgcui-repairable', '');
 						}
 					}
 
@@ -2551,20 +2499,6 @@
 						});
 				}
 
-				function keyupHandler(event) {
-					if (event.code != 'KeyR') { return; }
-
-					const refEntry = document.querySelector('.inventory__item[sbgcui-repairable]');
-					const pointGuid = refEntry?.dataset.ref;
-
-					if (refEntry == null) { return; }
-
-					recursiveRepair(pointGuid, refEntry);
-					refEntry.scrollIntoView();
-					refEntry.removeAttribute('sbgcui-repairable');
-					refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
-				}
-
 				window.makeEntryDec = makeEntryDec;
 
 				inventoryContent.addEventListener('click', event => {
@@ -2585,9 +2519,6 @@
 
 					recursiveRepair(pointGuid, refEntry);
 				});
-
-				inventoryPopup.addEventListener('inventoryPopupOpened', () => { document.addEventListener('keyup', keyupHandler); });
-				inventoryPopup.addEventListener('inventoryPopupClosed', () => { document.removeEventListener('keyup', keyupHandler); });
 			}
 
 
@@ -4137,8 +4068,11 @@
 				}
 
 				function isPointInRange(point) {
-					const pointCoords = ol.proj.toLonLat(point.getGeometry().getCoordinates());
-					return getDistance(pointCoords) < PLAYER_RANGE;
+					const playerCoords = playerFeature.getGeometry().getCoordinates();
+					const pointCoords = point.getGeometry().getCoordinates();
+					const distanceToPlayer = Math.sqrt(Math.pow(pointCoords[0] - playerCoords[0], 2) + Math.pow(pointCoords[1] - playerCoords[1], 2));
+
+					return distanceToPlayer < toOLMeters(PLAYER_RANGE);
 				}
 
 				function getPointsInRange() {
@@ -4284,13 +4218,16 @@
 
 				document.addEventListener('keydown', keydownHandler);
 
-				const autoShowPointsButton = document.createElement('button');
+				if (player.name == 'NickolayV') {
+					//const autoShowPointsButton = document.createElement('button');
+					var autoShowPointsButton = document.createElement('button');
 
-				autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
-				autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
-				state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+					autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
+					autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
+					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
 
-				toolbar.addItem(autoShowPointsButton, 7);
+					toolbar.addItem(autoShowPointsButton, 7);
+				}
 			}
 
 
@@ -5074,15 +5011,11 @@
 						const request = logsStore.getAll(keyRange);
 
 						logContent.innerHTML = '';
-						logContent.setAttribute('data-searchInProgress', '');
 						tagsWrapper.dataset.totalentries = 0;
 
 						request.addEventListener('success', event => {
 							const logs = event.target.result;
-							if (logs.length == 0) {
-								logContent.removeAttribute('data-searchInProgress');
-								return;
-							}
+							if (logs.length == 0) { return; }
 
 							const guidsTitles = {};
 							const pointsWithoutTitle = [];
@@ -5114,7 +5047,6 @@
 							const promises = pointsWithoutTitle.map(guid => getPointData(guid));
 							Promise.all(promises)
 								.then(results => {
-									logContent.removeAttribute('data-searchInProgress');
 									results.forEach(point => { guidsTitles[point.g] = point.t; });
 									logs.forEach(action => {
 										const entry = document.createElement('p');
@@ -5261,12 +5193,8 @@
 										logContent.appendChild(entry);
 									});
 								})
-								.catch(error => {
-									console.log('SBG CUI: Ошибка при получении данных точек (логи).', error);
-									logContent.removeAttribute('data-searchInProgress');
-								});
+								.catch(error => { console.log('SBG CUI: Ошибка при получении данных точек (логи).', error); });
 						});
-						request.addEventListener('error', () => { logContent.removeAttribute('data-searchInProgress'); });
 					}
 
 					function showPointInfo(event) {
@@ -5465,6 +5393,7 @@
 
 				manageAmountButtons.before(wrapper);
 			}
+
 			window.cuiStatus = 'loaded';
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
