@@ -3663,7 +3663,7 @@
 						switch (type) {
 							case 'energy':
 								let energy = inview[this.id_]?.energy;
-								//return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
+								return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
 							case 'level':
 								let level = inview[this.id_]?.level;
 								return typeof level == 'number' ? String(level) : null;
