@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.54
+// @version      1.14.55
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.54';
+	const USERSCRIPT_VERSION = '1.14.55';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -998,6 +998,7 @@
 			let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
+			let isSettingsMenuOpened = false;
 			let isRefsViewerOpened = false;
 			let isClusterOverlayOpened = false;
 			let isInvClearInProgress = false;
@@ -1050,7 +1051,7 @@
 
 			async function getPossibleLines(pointGuid, pointCoords) {
 				const isExref = JSON.parse(localStorage.getItem('settings')).exref ?? false;
-				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}`;
+				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}&sbgcuiPossibleLinesCheck`;
 				const options = { headers, method: 'GET' };
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
@@ -1696,11 +1697,11 @@
 
 											const hParam = url.searchParams.get('h');
 											const isUniqueInRequest = hParam != null;
-											const isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
-
+											const isHighlightCoresEnergyOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|energy|highlevel|level/)) != undefined;
+											
 											if (!inviewPoints) { break; }
 
-											if (isHighlightCoresOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
+											if (isHighlightCoresEnergyOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
 												let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
 
 												if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
@@ -1740,55 +1741,59 @@
 
 												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
 											} else if ('data' in parsedResponse) {
-												let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
-												minDistance = minDistance == -1 ? -Infinity : +minDistance;
-												maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
+												const isPossibleLinesCheck = url.searchParams.get('sbgcuiPossibleLinesCheck') != null;
 
-												if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
-													const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
-													const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
+												if (isPossibleLinesCheck == false) { // Тосты о скрытых линиях выводятся только при реальном запросе draw, а не проверке поссиблов.
+													let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
+													minDistance = minDistance == -1 ? -Infinity : +minDistance;
+													maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
+												
+													if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
+														const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
+														const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
 
-													parsedResponse.data = targetPoint ? [targetPoint] : [];
+														parsedResponse.data = targetPoint ? [targetPoint] : [];
 
-													if (hiddenPoints > 0) {
-														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+														if (hiddenPoints > 0) {
+															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка, так как вы находитесь в режиме рисования "Звезда".`;
-														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-														toast.showToast();
+															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+															toast.showToast();
+														}
 													}
-												}
 
-												if (isFinite(minDistance) || isFinite(maxDistance)) {
-													const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
-													const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
+													if (isFinite(minDistance) || isFinite(maxDistance)) {
+														const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
+														const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
 
-													if (hiddenPoints > 0) {
-														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+														if (hiddenPoints > 0) {
+															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка согласно настройкам ограничения дальности рисования
 																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
-														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-														toast.showToast();
+															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+															toast.showToast();
 
-														parsedResponse.data = suitablePoints;
-													}
-												}
-
-												if (hideLastFavRef) {
-													let hiddenPoints = 0;
-													parsedResponse.data = parsedResponse.data.filter(point => {
-														const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
-														if (isLastFavRef) {
-															hiddenPoints += 1;
-															return false;
-														} else {
-															return true;
+															parsedResponse.data = suitablePoints;
 														}
-													});
-													if (hiddenPoints > 0) {
-														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+													}
+
+													if (hideLastFavRef) {
+														let hiddenPoints = 0;
+														parsedResponse.data = parsedResponse.data.filter(point => {
+															const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
+															if (isLastFavRef) {
+																hiddenPoints += 1;
+																return false;
+															} else {
+																return true;
+															}
+														});
+														if (hiddenPoints > 0) {
+															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка согласно настройке сохранения последних сносок от избранных точек.`;
-														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-														toast.showToast();
+															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+															toast.showToast();
+														}
 													}
 												}
 
@@ -1912,6 +1917,7 @@
 					isInventoryPopupOpened ||
 					isPointPopupOpened ||
 					isProfilePopupOpened ||
+					isSettingsMenuOpened ||
 					isRefsViewerOpened
 				);
 			}
@@ -2823,7 +2829,6 @@
 				}
 
 				const isValidAmount = value => !(value == '' || value == '-0' || Number.isInteger(+value) == false || +value < -1);
-				let isSettingsMenuOpened = false;
 
 				try {
 					var settingsMenu = await getHTMLasset('settings');
@@ -3663,7 +3668,6 @@
 						switch (type) {
 							case 'energy':
 								let energy = inview[this.id_]?.energy;
-//alert(JSON.stringify(inview[this.id_]));
 								return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
 							case 'level':
 								let level = inview[this.id_]?.level;
@@ -4132,7 +4136,7 @@
 				function isDiscoverable(point) {
 					const guid = point.getId();
 					const now = Date.now();
-					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid];
+					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))?.[guid];
 
 					return cooldown?.t == undefined || (cooldown.t <= now && cooldown.c > 0);
 				}
