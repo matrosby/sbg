@@ -3663,7 +3663,7 @@
 						switch (type) {
 							case 'energy':
 								let energy = inview[this.id_]?.energy;
-//alert(JSON.stringify(inview[this.id_]));
+alert(JSON.stringify(inview[this.id_]));
 								return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
 							case 'level':
 								let level = inview[this.id_]?.level;
