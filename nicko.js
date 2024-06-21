@@ -678,7 +678,7 @@
 					let pointEnergy = 0;
 
 					for (let guid in this.cores) {
-						maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
+						maxPointEnergy += CORES_ENERGY[this.cores[guid].energy];
 						pointEnergy += this.cores[guid].energy;
 					}
 
