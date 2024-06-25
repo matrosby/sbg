@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.61
+// @version      1.14.59
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.61';
+	const USERSCRIPT_VERSION = '1.14.59';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -674,22 +674,18 @@
 					return playerCores; // { level: amount }
 				}
 
-				static calculateTotalEnergy(cores) {
-					if (Object.keys(cores).length == 0) { return 0; }
+				get energy() {
+					if (Object.keys(this.cores).length == 0) { return 0; }
 
 					let maxPointEnergy = 0;
 					let pointEnergy = 0;
 
-					for (let guid in cores) {
-						maxPointEnergy += CORES_ENERGY[cores[guid].level];
-						pointEnergy += cores[guid].energy;
+					for (let guid in this.cores) {
+						maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
+						pointEnergy += this.cores[guid].energy;
 					}
 
 					return pointEnergy / maxPointEnergy * 100;
-				}
-
-				get energy() {
-					return Point.calculateTotalEnergy(this.cores);
 				}
 
 				get energyFormatted() {
@@ -1096,9 +1092,9 @@
 			async function repairPoint(guid) {
 				const url = '/api/repair';
 				const options = {
-					headers: { ...headers, 'content-type': 'application/json' },
+					headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 					method: 'POST',
-					body: JSON.stringify({ guid, position: [0.0, 0.0] }),
+					body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`
 				};
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
@@ -1614,11 +1610,6 @@
 														delete inview[guid];
 													});
 												}
-
-												parsedResponse.c.forEach(point => {
-													if (point.guid in inview) { inview[point.guid].energy = point.energy * 100; }
-												});
-
 											}
 
 											break;
@@ -1824,14 +1815,8 @@
 											}
 											break;
 										case '/api/repair':
-											if ('data' in parsedResponse) {
-												const guid = JSON.parse(options.body).guid;
-												if (isPointPopupOpened) { lastOpenedPoint.update(parsedResponse.data); }
-												if (guid in inview) {
-													const cores = parsedResponse.data.reduce((acc, curr) => { acc[curr.g] = { energy: curr.e, level: curr.l }; return acc; }, {});
-													const totalEnergy = Point.calculateTotalEnergy(cores);
-													inview[guid].energy = totalEnergy;
-												}
+											if ('data' in parsedResponse && isPointPopupOpened) {
+												lastOpenedPoint.update(parsedResponse.data);
 											}
 											break;
 										case '/api/score':
@@ -4566,7 +4551,7 @@
 				toolbar.addItem(button, 5);
 			}
 
-
+		
 			/* Дата захвата точки */
 			{
 				function updateCaptureDate(event) {
@@ -4587,12 +4572,12 @@
 				timeoutSpan.classList.add('sbgcui_discharge_timeout');
 				document.querySelector('.i-stat').appendChild(timeoutSpan);
 
-				pointPopup.addEventListener('pointPopupOpened', () => { timeoutSpan.innerText = '~'; });
+				pointPopup.addEventListener('pointPopupOpened', () => { timeoutSpan.innerText = ''; });
 				window.addEventListener('pointCaptureDateFound', updateCaptureDate);
 				window.addEventListener('pointCaptured', updateCaptureDate);
 			}
 
-
+		
 			/* Вращение карты */
 			{
 				let latestTouchPoint = null;
