@@ -2026,9 +2026,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
-				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
+				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
+				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -3394,7 +3394,7 @@
 					let guid = event.target.closest('.inventory__item').dataset.ref;
 
 					if (!guid) { return; }
-					if (confirm('Открыть карточку точки? Либо нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/app/?point=${guid}`; }
+					if (confirm('Открыть карточку точки? Либо нажмите "Отмена" для перехода к месту на карте.')) { window.showInfo(guid); }
 				});
 			}
 
