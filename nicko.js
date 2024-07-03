@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.61
+// @version      1.14.62
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -63,7 +63,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.61';
+	const USERSCRIPT_VERSION = '1.14.62';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -519,6 +519,8 @@
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
 									}`;
+				case `$('body').empty()`:
+					return 'movePlayer([0,0]); undefined?';
 				case `const attack_slider`: // Line ~409
 					return `window.attack_slider`;
 				case `const deploy_slider`: // Line ~427
@@ -569,6 +571,7 @@
 			`((new ol\\.Feature\\({(?=\\s+?geometry: new ol\\.geom\\.Point\\(mpos\\))))`,
 			`(constrainResolution: true)`,
 			`(movePlayer\\(\\[coords\\.longitude, coords\\.latitude\\]\\))`,
+			`(\\$\\('body'\\)\\.empty\\(\\))`,
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
@@ -590,7 +593,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 26;
+		const replacesShouldBe = 29;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -781,7 +784,7 @@
 
 					if (this.team == 0 && cores.length == 1) {
 						this.team = player.team;
-						
+
 						const eventDetails = { guid: this.guid, date: new Date() };
 						const customEvent = new CustomEvent('pointCaptured', { detail: eventDetails });
 						window.dispatchEvent(customEvent);
@@ -1507,10 +1510,69 @@
 			}
 
 			function jumpTo(coords) {
+				const olCoords = ol.proj.fromLonLat(coords);
+
 				if (isFollow) { click(toggleFollow); }
+
 				document.querySelectorAll('.popup').forEach(popup => { popup.classList.add('hidden'); });
+
 				view.adjustCenter([0, VIEW_PADDING / -2]);
-				view.setCenter(ol.proj.fromLonLat(coords));
+				view.setCenter(olCoords);
+				view.setZoom(17);
+			}
+
+			function highlightPoint(point, coords = [], once) {
+				function animate(event) {
+					const frameState = event.frameState;
+					const elapsed = frameState.time - start;
+
+					if (elapsed < duration) {
+						const vectorContext = ol.render.getVectorContext(event);
+						const elapsedRatio = elapsed / duration;
+
+						const radius = ol.easing.easeOut(elapsedRatio) * 20;
+						const opacity = ol.easing.easeOut(1 - elapsedRatio);
+
+						stroke.setWidth(strokeWidth * (1 - elapsedRatio));
+						circle.setRadius(toOLMeters(radius));
+						circle.setOpacity(opacity);
+						circle.setRotation(Math.PI * 2 * (1 - elapsedRatio));
+						circle.setStroke(stroke);
+						highlighterFeature.changed();
+
+						vectorContext.drawGeometry(geometry);
+					} else if (once == true) {
+						stopAnimation();
+						return;
+					} else {
+						start = Date.now();
+					}
+
+					map.render();
+				}
+
+				function stopAnimation() {
+					ol.Observable.unByKey(listenerKey);
+					customPointsSource.removeFeature(highlighterFeature);
+				}
+
+				let start = Date.now();
+				const olCoords = point != undefined ? point.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
+				const duration = 1500;
+				const strokeWidth = 5;
+				const geometry = new ol.geom.Point(olCoords);
+				const highlighterFeature = new ol.Feature({ geometry });
+				const stroke = new ol.style.Stroke({ color: [204, 187, 0], width: strokeWidth });
+				const circle = new ol.style.Circle({ opacity: 1, radius: 0, stroke });
+				const highlighterStyle = new ol.style.Style({ image: circle });
+				const listenerKey = customPointsLayer.on('postrender', animate);
+
+				highlighterFeature.set('type', 'highlighter');
+				highlighterFeature.setStyle(highlighterStyle);
+				customPointsSource.forEachFeature(feature => { if (feature.get('type') == 'highlighter') { customPointsSource.removeFeature(feature); } });
+				customPointsSource.addFeature(highlighterFeature);
+
+				map.once('click', stopAnimation);
 			}
 
 			function fetchDecorator(fetch) {
@@ -2455,6 +2517,17 @@
 				clearTilesCacheButton.innerText = i18next.t('sbgcui.clearTilesCache');
 				clearTilesCacheButton.addEventListener('click', clearTilesCache);
 				layersConfigButtons.appendChild(clearTilesCacheButton);
+
+
+				var customPointsSource = new ol.source.Vector();
+				var customPointsLayer = new ol.layer.Vector({
+					source: customPointsSource,
+					name: 'sbgcui_points',
+					minZoom: 15,
+					className: 'ol-layer__sbgcui_points',
+					zIndex: 9
+				});
+				map.addLayer(customPointsLayer);
 			}
 
 
@@ -3937,6 +4010,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
+						highlightPoint(chosenFeature, undefined, true);
 					}, overlayTransitionsTime);
 				}
 
@@ -3959,7 +4033,13 @@
 					let featuresToDisplay = featuresAtPixel.slice();
 
 					if (featuresToDisplay.length <= 1 || mapClickEvent.isSilent) { // isSilent: такой эвент генерируется при свайпе между карточками точек.
-						featuresToDisplay[0]?.set('sbgcui_chosenFeature', true, true);
+						const feature = featuresToDisplay[0];
+
+						if (feature != undefined) {
+							feature.set('sbgcui_chosenFeature', true, true);
+							highlightPoint(feature, undefined, true);
+						}
+
 						originalOnClick(mapClickEvent);
 					} else {
 						sortFeaturesByAngle(featuresToDisplay);
@@ -4251,6 +4331,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
+					highlightPoint(nextPoint, undefined, true);
 				}
 
 				function toggleArrowVisibility() {
@@ -4487,25 +4568,13 @@
 
 			/* Точка в [0, 0] */
 			{
-				const customPointsSource = new ol.source.Vector();
-				const customPointsLayer = new ol.layer.Vector({
-					source: customPointsSource,
-					name: 'sbgcui_points',
-					minZoom: 15,
-					className: 'ol-layer__sbgcui_points',
-					zIndex: 9
-				});
-
 				try {
 					const popup = await getHTMLasset('zero-point-info');
 					const zeroPointFeature = new ol.Feature({
 						geometry: new ol.geom.Point([0, 0])
 					});
 
-					popup.addEventListener('click', () => {
-						popup.classList.add('sbgcui_hidden');
-						setTimeout(() => { popup.style.zIndex = 0; }, 100);
-					});
+					popup.addEventListener('click', () => { popup.classList.add('sbgcui_hidden'); });
 					document.body.appendChild(popup);
 
 					zeroPointFeature.setId('sbgcui_zeroPoint');
@@ -4527,16 +4596,13 @@
 						});
 
 						if (features.includes(zeroPointFeature)) {
-							popup.classList.remove('sbgcui_hidden');
-							setTimeout(() => { popup.style.zIndex = 9; }, 100);
+							setTimeout(() => popup.classList.remove('sbgcui_hidden'), 100);
 						}
 					});
 					customPointsSource.addFeature(zeroPointFeature);
 				} catch (error) {
 					console.log('SBG CUI: Ошибка (точка [0, 0]).', error);
 				}
-
-				map.addLayer(customPointsLayer);
 			}
 
 
@@ -4693,7 +4759,7 @@
 				const jumpToButton = document.createElement('button');
 
 				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); });
+				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightPoint(undefined, lastOpenedPoint.coords, false); });
 				pointPopup.appendChild(jumpToButton);
 
 				try {
@@ -5430,7 +5496,7 @@
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
-								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightPoint(undefined, coords, false); };
 							}
 							destroyNotifsToasts.add(toast);
 
