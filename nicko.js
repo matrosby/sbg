@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.62
+// @version      1.14.63
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -63,7 +63,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.62';
+	const USERSCRIPT_VERSION = '1.14.63';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1017,6 +1017,7 @@
 			const inventoryContent = document.querySelector('.inventory__content');
 			const inventoryPopup = document.querySelector('.inventory.popup');
 			const invTotalSpan = document.querySelector('#self-info__inv');
+			const leaderboardPopup = document.querySelector('.leaderboard.popup');
 			const notifsButton = document.querySelector('#notifs-menu');
 			const pointCores = document.querySelector('.i-stat__cores');
 			const pointImage = document.querySelector('#i-image');
@@ -1045,6 +1046,7 @@
 			let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
+			let isleaderboardPopupOpened = !leaderboardPopup.classList.contains('hidden');
 			let isSettingsMenuOpened = false;
 			let isRefsViewerOpened = false;
 			let isClusterOverlayOpened = false;
@@ -1893,6 +1895,7 @@
 											if ('name' in parsedResponse) {
 												regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.created_at));
 											}
+
 											break;
 										case '/api/repair':
 											if ('data' in parsedResponse) {
@@ -1919,6 +1922,18 @@
 												pointsStatTds.forEach((td, i) => { td.style.gridArea = `p${pointsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
 												regionsStatTds.forEach((td, i) => { td.style.gridArea = `r${regionsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
 											}
+
+											break;
+										case '/api/leaderboard':
+											if (!('d' in parsedResponse)) { break; }
+
+											const teams = parsedResponse.d.reduce((total, entry) => {
+												total[entry.t] = total[entry.t] ?? 0;
+												total[entry.t] += 1;
+												return total;
+											}, []);
+											const topTeam = teams.findIndex(entry => entry == Math.max(...teams.flat()));
+											leaderboardPopup.style.setProperty('--sbgcui-top-team', `var(--team-${topTeam})`);
 
 											break;
 										default:
@@ -2009,6 +2024,7 @@
 					isInventoryPopupOpened ||
 					isPointPopupOpened ||
 					isProfilePopupOpened ||
+					isleaderboardPopupOpened ||
 					isSettingsMenuOpened ||
 					isRefsViewerOpened
 				);
@@ -2088,9 +2104,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
-				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
+				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
+				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2144,6 +2160,22 @@
 					if (event) { records[0].target.dispatchEvent(event); }
 				});
 				pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ['class'] });
+
+
+				let leaderboardPopupObserver = new MutationObserver(records => {
+					let event;
+
+					if (records[0].target.classList.contains('hidden')) {
+						event = new Event('leaderboardPopupClosed');
+						isleaderboardPopupOpened = false;
+					} else if (records[0].oldValue?.includes('hidden')) {
+						event = new Event('leaderboardPopupOpened');
+						isleaderboardPopupOpened = true;
+					}
+
+					if (event) { records[0].target.dispatchEvent(event); }
+				});
+				leaderboardPopupObserver.observe(leaderboardPopup, { attributes: true, attributeOldValue: true, attributeFilter: ['class'] });
 
 
 				let profilePopupObserver = new MutationObserver(records => {
@@ -2423,6 +2455,12 @@
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
 					'items.catalyser-short': '{{level}}',
 					'items.core-short': '{{level}}',
+				});
+				['cm', 'm', 'km', 'sqm', 'sqkm'].forEach(unit => {
+					const key = `units.${unit}`;
+					let value = i18next.getResource(i18next.resolvedLanguage, 'main', key);
+					value = value.replace(/(maximumFractionDigits:\s)(\d)/, '$1$2; minimumFractionDigits: $2');
+					i18next.addResource(i18next.resolvedLanguage, 'main', key, value);
 				});
 
 				window.attack_slider.options = {
