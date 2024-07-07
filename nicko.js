@@ -1560,7 +1560,7 @@
 
 				let start = Date.now();
 				const olCoords = point != undefined ? point.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
-				const duration = 500;
+				const duration = 1500;
 				const strokeWidth = 5;
 				const geometry = new ol.geom.Point(olCoords);
 				const highlighterFeature = new ol.Feature({ geometry });
