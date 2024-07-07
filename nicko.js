@@ -1523,6 +1523,7 @@
 				view.setZoom(17);
 			}
 
+/*
 			function highlightPoint(point, coords = [], once) {
 				function animate(event) {
 					const frameState = event.frameState;
@@ -1547,8 +1548,7 @@
 						stopAnimation();
 						return;
 					} else {
-						stopAnimation();
-						return;
+						start = Date.now();
 					}
 
 					map.render();
@@ -1577,6 +1577,7 @@
 
 				map.once('click', stopAnimation);
 			}
+*/
 
 			function fetchDecorator(fetch) {
 				return async function (pathNquery, options) {
