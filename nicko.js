@@ -1547,7 +1547,8 @@
 						stopAnimation();
 						return;
 					} else {
-						start = Date.now();
+						stopAnimation();
+						return;
 					}
 
 					map.render();
