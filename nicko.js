@@ -1523,11 +1523,59 @@
 				view.setZoom(17);
 			}
 
+			function highlightPoint(point, coords = [], once) {
+				function animate(event) {
+					const frameState = event.frameState;
+					const elapsed = frameState.time - start;
 
+					if (elapsed < duration) {
+						const vectorContext = ol.render.getVectorContext(event);
+						const elapsedRatio = elapsed / duration;
 
+						const radius = ol.easing.easeOut(elapsedRatio) * 20;
+						const opacity = ol.easing.easeOut(1 - elapsedRatio);
 
+						stroke.setWidth(strokeWidth * (1 - elapsedRatio));
+						circle.setRadius(toOLMeters(radius));
+						circle.setOpacity(opacity);
+						circle.setRotation(Math.PI * 2 * (1 - elapsedRatio));
+						circle.setStroke(stroke);
+						highlighterFeature.changed();
 
+						vectorContext.drawGeometry(geometry);
+					} else if (once == true) {
+						stopAnimation();
+						return;
+					} else {
+						start = Date.now();
+					}
 
+					map.render();
+				}
+
+				function stopAnimation() {
+					ol.Observable.unByKey(listenerKey);
+					customPointsSource.removeFeature(highlighterFeature);
+				}
+
+				let start = Date.now();
+				const olCoords = point != undefined ? point.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
+				const duration = 1500;
+				const strokeWidth = 5;
+				const geometry = new ol.geom.Point(olCoords);
+				const highlighterFeature = new ol.Feature({ geometry });
+				const stroke = new ol.style.Stroke({ color: [204, 187, 0], width: strokeWidth });
+				const circle = new ol.style.Circle({ opacity: 1, radius: 0, stroke });
+				const highlighterStyle = new ol.style.Style({ image: circle });
+				const listenerKey = customPointsLayer.on('postrender', animate);
+
+				highlighterFeature.set('type', 'highlighter');
+				highlighterFeature.setStyle(highlighterStyle);
+				customPointsSource.forEachFeature(feature => { if (feature.get('type') == 'highlighter') { customPointsSource.removeFeature(feature); } });
+				customPointsSource.addFeature(highlighterFeature);
+
+				map.once('click', stopAnimation);
+			}
 
 			function fetchDecorator(fetch) {
 				return async function (pathNquery, options) {
@@ -4000,7 +4048,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						highlightPoint(chosenFeature, undefined, true);
+//						highlightPoint(chosenFeature, undefined, true);
 					}, overlayTransitionsTime);
 				}
 
