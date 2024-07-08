@@ -4075,7 +4075,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							highlightPoint(feature, undefined, true);
+//							highlightPoint(feature, undefined, true);
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4369,7 +4369,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					highlightPoint(nextPoint, undefined, true);
+//					highlightPoint(nextPoint, undefined, true);
 				}
 
 				function toggleArrowVisibility() {
