@@ -1524,12 +1524,12 @@
 			}
 
 
-			function highlightPoint(point, coords = [], null) {
+			function highlightPoint(point, coords = [], once) {
 				function animate(event) {
 					const frameState = event.frameState;
 					const elapsed = frameState.time - start;
 
-					if (elapsed < duration) {
+					if (elapsed > duration) {
 						const vectorContext = ol.render.getVectorContext(event);
 						const elapsedRatio = elapsed / duration;
 
