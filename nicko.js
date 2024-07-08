@@ -1523,7 +1523,8 @@
 				view.setZoom(17);
 			}
 
-			function highlightPoint(point, coords = [], once) {
+
+			function highlightPoint(point, coords = [], null) {
 				function animate(event) {
 					const frameState = event.frameState;
 					const elapsed = frameState.time - start;
