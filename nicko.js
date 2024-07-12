@@ -1110,9 +1110,9 @@
 			async function repairPoint(guid) {
 				const url = '/api/repair';
 				const options = {
-					headers: { ...headers, 'content-type': 'application/json' },
+					headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 					method: 'POST',
-					body: JSON.stringify({ guid, position: [0.0, 0.0] }),
+					body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`
 				};
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
@@ -1538,7 +1538,6 @@
 						stroke.setWidth(strokeWidth * (1 - elapsedRatio));
 						circle.setRadius(toOLMeters(radius));
 						circle.setOpacity(opacity);
-						circle.setRotation(Math.PI * 2 * (1 - elapsedRatio));
 						circle.setStroke(stroke);
 						highlighterFeature.changed();
 
