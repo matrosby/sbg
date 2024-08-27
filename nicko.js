@@ -693,7 +693,7 @@
 				}
 
 				get energy() {
-					return Point.calculateTotalEnergy(cores);
+					return Point.calculateTotalEnergy(this.cores);
 				}
 
 				get energyFormatted() {
