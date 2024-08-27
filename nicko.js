@@ -658,9 +658,9 @@
 					let maxPointEnergy = 0;
 					let pointEnergy = 0;
 
-					for (let guid in this.cores) {
-						maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
-						pointEnergy += this.cores[guid].energy;
+					for (let guid in cores) {
+						maxPointEnergy += CORES_ENERGY[cores[guid].level];
+						pointEnergy += cores[guid].energy;
 					}
 
 					return pointEnergy / maxPointEnergy * 100;
@@ -693,7 +693,7 @@
 				}
 
 				get energy() {
-					return Point.calculateTotalEnergy(this.cores);
+					return Point.calculateTotalEnergy(cores);
 				}
 
 				get energyFormatted() {
