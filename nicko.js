@@ -1688,7 +1688,7 @@
 												}
 
 												parsedResponse.c.forEach(point => {
-													if (point.guid in inview) { inview[point.guid].energy = point.energy * 100; }
+													if (point.guid in inview) { inview[point.guid].energy = pointenergy * 100; }
 												});
 
 											}
