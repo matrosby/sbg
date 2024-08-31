@@ -1673,7 +1673,7 @@
 											database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
 
 											if ('c' in parsedResponse) {
-												const destroyedPoints = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
+												const destroyedPoints = parsedResponse.c.filter(point => pointenergy == 0).map(point => point.guid);
 
 												if (destroyedPoints.length > 0) {
 													const lines = parsedResponse.l.length;
