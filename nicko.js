@@ -4096,7 +4096,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							highlightFeature(feature, undefined, { once: true });
+							//highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
