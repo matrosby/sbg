@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.63
+// @version      1.14.65
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -63,8 +63,9 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.63';
+	const USERSCRIPT_VERSION = '1.14.65';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
+	const BLAST_ANIMATION_DURATION = 800;
 
 
 	const config = {}, state = {}, favorites = {};
@@ -519,7 +520,7 @@
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
 									}`;
-				case `$('body').empty()`:
+				case `$('body').empty()`: // Line ~363
 					return 'movePlayer([0,0]); undefined?';
 				case `const attack_slider`: // Line ~409
 					return `window.attack_slider`;
@@ -531,6 +532,8 @@
 					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
 					return `${match}return;`;
+				case `explodeRange(item.l)`: // Line ~1005
+					return `window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: Catalysers[item.l].range, color: '#FF0000', width: 5 + item.l / 2 })`;
 				case `$('[name="baselayer"]').on('change', e`: // Line ~1108
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`: // Line ~1244
@@ -558,7 +561,7 @@
 				case `if (type == 'osm') {`: // Line ~2166
 					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
 				case `class Bitfield`: // Line ~2306
-					return `window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
+					return `window.openProfile = openProfile; window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
 				default:
 					replacesMade -= 1;
 					return match;
@@ -577,6 +580,7 @@
 			`(const draw_slider)`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
+			`(explodeRange\\(item\\.l\\))`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
@@ -593,7 +597,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 29;
+		const replacesShouldBe = 30;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -1110,9 +1114,9 @@
 			async function repairPoint(guid) {
 				const url = '/api/repair';
 				const options = {
-					headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+					headers: { ...headers, 'content-type': 'application/json' },
 					method: 'POST',
-					body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`
+					body: JSON.stringify({ guid, position: [0.0, 0.0] }),
 				};
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
@@ -1523,26 +1527,26 @@
 				view.setZoom(17);
 			}
 
-			function highlightPoint(point, coords = [], once) {
+			function highlightFeature(feature, coords = [], options) {
 				function animate(event) {
 					const frameState = event.frameState;
 					const elapsed = frameState.time - start;
 
-					if (elapsed < duration) {
+					if (elapsed < options.duration) {
 						const vectorContext = ol.render.getVectorContext(event);
-						const elapsedRatio = elapsed / duration;
+						const elapsedRatio = elapsed / options.duration;
 
-						const radius = ol.easing.easeOut(elapsedRatio) * 20;
+						const radius = ol.easing.easeOut(elapsedRatio) * (toOLMeters(options.radius) / resolution);
 						const opacity = ol.easing.easeOut(1 - elapsedRatio);
 
-						stroke.setWidth(strokeWidth * (1 - elapsedRatio));
-						circle.setRadius(toOLMeters(radius));
+						stroke.setWidth(options.width * (1 - elapsedRatio));
+						circle.setRadius(radius);
 						circle.setOpacity(opacity);
 						circle.setStroke(stroke);
 						highlighterFeature.changed();
 
 						vectorContext.drawGeometry(geometry);
-					} else if (once == true) {
+					} else if (options.once == true) {
 						stopAnimation();
 						return;
 					} else {
@@ -1557,20 +1561,27 @@
 					customPointsSource.removeFeature(highlighterFeature);
 				}
 
+				options = {
+					once: false,
+					radius: 20,
+					duration: 1500,
+					color: '#CCBB00',
+					width: 5,
+					...options
+				};
+
 				let start = Date.now();
-				const olCoords = point != undefined ? point.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
-				const duration = 1500;
-				const strokeWidth = 5;
+				const olCoords = feature != undefined ? feature.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
+				const resolution = view.getResolution();
 				const geometry = new ol.geom.Point(olCoords);
 				const highlighterFeature = new ol.Feature({ geometry });
-				const stroke = new ol.style.Stroke({ color: [204, 187, 0], width: strokeWidth });
+				const stroke = new ol.style.Stroke({ color: options.color, width: options.width });
 				const circle = new ol.style.Circle({ opacity: 1, radius: 0, stroke });
 				const highlighterStyle = new ol.style.Style({ image: circle });
 				const listenerKey = customPointsLayer.on('postrender', animate);
 
 				highlighterFeature.set('type', 'highlighter');
 				highlighterFeature.setStyle(highlighterStyle);
-				customPointsSource.forEachFeature(feature => { if (feature.get('type') == 'highlighter') { customPointsSource.removeFeature(feature); } });
 				customPointsSource.addFeature(highlighterFeature);
 
 				map.once('click', stopAnimation);
@@ -1673,7 +1684,7 @@
 											database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
 
 											if ('c' in parsedResponse) {
-												const destroyedPoints = parsedResponse.c.filter(point => pointenergy == 0).map(point => point.guid);
+												const destroyedPoints = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
 
 												if (destroyedPoints.length > 0) {
 													const lines = parsedResponse.l.length;
@@ -1688,7 +1699,7 @@
 												}
 
 												parsedResponse.c.forEach(point => {
-													if (point.guid in inview) { inview[point.guid].energy = pointenergy * 100; }
+													if (point.guid in inview) { inview[point.guid].energy = point.energy * 100; }
 												});
 
 											}
@@ -1926,13 +1937,13 @@
 										case '/api/leaderboard':
 											if (!('d' in parsedResponse)) { break; }
 
-											const teams = parsedResponse.d.reduce((total, entry) => {
+											const contributions = parsedResponse.d.reduce((total, entry) => {
 												total[entry.t] = total[entry.t] ?? 0;
-												total[entry.t] += 1;
+												total[entry.t] += entry.s;
 												return total;
 											}, []);
-											const topTeam = teams.findIndex(entry => entry == Math.max(...teams.flat()));
-											leaderboardPopup.style.setProperty('--sbgcui-top-team', `var(--team-${topTeam})`);
+											const topContributor = contributions.findIndex(entry => entry == Math.max(...contributions.flat()));
+											leaderboardPopup.style.setProperty('--sbgcui-top-team', `var(--team-${topContributor})`);
 
 											break;
 										default:
@@ -1990,9 +2001,13 @@
 				}
 			}
 
-			function clearTilesCache() {
+			function clearTilesCache(event) {
 				const transaction = database.transaction('tiles', 'readwrite');
 				const tilesStore = transaction.objectStore('tiles');
+				const clearButton = event.target;
+
+				clearButton.disabled = true;
+				clearButton.innerText = i18next.t('sbgcui.calculatingTilesCache');
 
 				tilesStore.getAll().addEventListener('success', event => {
 					const baselayers = new Set();
@@ -2012,6 +2027,9 @@
 					const size = +(storeCapacity.size / 1024 / 1024).toFixed(1);
 					const message = i18next.t('sbgcui.clearTilesCacheConfirm', { amount, size, baselayers: baselayers.size });
 					confirm(message) && tilesStore.clear();
+
+					clearButton.disabled = false;
+					clearButton.innerText = i18next.t('sbgcui.clearTilesCache');
 				});
 			}
 
@@ -2432,6 +2450,7 @@
 					'sbgcui.distance': 'Расстояние',
 					'sbgcui.clearTilesCache': 'Очистить кэш',
 					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{amount}} тайлов от {{baselayers}} подложек. Всего {{size}} МБ занято.',
+					'sbgcui.calculatingTilesCache': 'Подсчёт...',
 					'sbgcui.captured': 'Захвачена: {{date}} ({{uptime}} дн.)',
 				});
 				i18next.addResources('en', 'main', {
@@ -2449,6 +2468,7 @@
 					'sbgcui.distance': 'Distance',
 					'sbgcui.clearTilesCache': 'Clear cache',
 					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{amount}} tiles from {{baselayers}} baselayers. Total {{size}} MB used.',
+					'sbgcui.calculatingTilesCache': 'Calculating...',
 					'sbgcui.captured': 'Captured: {{date}} ({{uptime}} d.)',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
@@ -2474,6 +2494,8 @@
 					//speed: 200,
 					//perPage: 2,
 				};
+				
+				window.highlightFeature = highlightFeature;
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
 
@@ -4047,7 +4069,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						highlightPoint(chosenFeature, undefined, true);
+						highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
@@ -4074,7 +4096,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							highlightPoint(feature, undefined, true);
+							highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4368,7 +4390,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					highlightPoint(nextPoint, undefined, true);
+					highlightFeature(nextPoint, undefined, { once: true });
 				}
 
 				function toggleArrowVisibility() {
@@ -4796,7 +4818,7 @@
 				const jumpToButton = document.createElement('button');
 
 				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightPoint(undefined, lastOpenedPoint.coords, false); });
+				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightFeature(undefined, lastOpenedPoint.coords); });
 				pointPopup.appendChild(jumpToButton);
 
 				try {
@@ -5533,7 +5555,7 @@
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
-								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightPoint(undefined, coords, false); };
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightFeature(undefined, coords); };
 							}
 							destroyNotifsToasts.add(toast);
 
@@ -5619,6 +5641,22 @@
 				wrapper.classList.add('sbgcui_inventory__ma-shortcuts');
 
 				manageAmountButtons.before(wrapper);
+			}
+
+
+			/* Поиск игрока */
+			{
+				const searchButton = document.createElement('button');
+
+				function clickHandler() {
+					const nickname = prompt('Введите имя игрока (чувствительно к регистру): ');
+					if (nickname != null) { window.openProfile(nickname); }
+				}
+
+				searchButton.classList.add('fa', 'fa-solid-magnifying-glass', 'sbgcui_button_reset', 'sbgcui_playerSearchButton');
+				searchButton.addEventListener('click', clickHandler);
+
+				leaderboardPopup.appendChild(searchButton);
 			}
 			window.cuiStatus = 'loaded';
 		} catch (error) {
