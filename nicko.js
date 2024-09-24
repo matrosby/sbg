@@ -4069,7 +4069,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						highlightFeature(chosenFeature, undefined, { once: true });
+						//highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
