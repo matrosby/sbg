@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.68
+// @version      1.14.69
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -63,7 +63,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.68';
+	const USERSCRIPT_VERSION = '1.14.69';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -1527,8 +1527,8 @@
 				return ol.sphere.getLength(line);
 			}
 
-			function isPointInRange(feature) {
-				const pointCoords = ol.proj.toLonLat(feature.getGeometry().getCoordinates());
+			function isPointInRange(feature, lonLat) {
+				const pointCoords = lonLat ?? ol.proj.toLonLat(feature.getGeometry().getCoordinates())
 				return getDistance(pointCoords) < PLAYER_RANGE;
 			}
 
@@ -2068,9 +2068,8 @@
 						const guid = lastOpenedPoint.guid;
 						const point = pointsSource.getFeatureById(guid);
 						const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid]?.t || 0;
-						const isInRange = isPointInRange(point);
+						const isInRange = isPointInRange(point, lastOpenedPoint.coords);
 						const isDiscoverable = new Date(cooldown) - Date.now() <= 0;
-
 						if (isInRange && isDiscoverable) {
 							pointPopup.classList.remove('hidden');
 						} else {
@@ -4430,7 +4429,7 @@
 						layerFilter: layer => layer.get('name') == 'points',
 					});
 
-					const pointsInRange = pointsHit.filter(isPointInRange);
+					const pointsInRange = pointsHit.filter(point => isPointInRange(point));
 
 					return pointsInRange;
 				}
