@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.66
+// @version      1.14.68
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -63,7 +63,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.66';
+	const USERSCRIPT_VERSION = '1.14.68';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -82,7 +82,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 8);
+	const openRequest = indexedDB.open('CUI', 9);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -171,6 +171,18 @@
 					stateStore.delete('baselayer');
 					tilesStore.clear();
 				},
+				9: () => {
+					const configStore = event.target.transaction.objectStore('config');
+					const request = configStore.get('drawing');
+
+					request.addEventListener('success', event => {
+						const drawing = event.target.result;
+
+						drawing.returnToPointInfo = 'discoverable';
+
+						configStore.put(drawing, 'drawing');
+					});
+				},
 			};
 
 			for (let v in updateToVersion) {
@@ -228,6 +240,7 @@
 				outerBottomColor: '#28C4F4',
 			},
 			drawing: {
+				returnToPointInfo: 'discoverable',
 				minDistance: -1,
 				maxDistance: -1,
 				hideLastFavRef: 0,
@@ -528,6 +541,8 @@
 					return `window.deploy_slider`;
 				case `const draw_slider`: // Line ~442
 					return `window.draw_slider`;
+				case `closePopup($('.info'))`: // Line ~674
+					return `$('.info').addClass('hidden');`;
 				case `if (new_val < 1) new_val = 1`: // Line ~795
 					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
@@ -538,6 +553,8 @@
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
+				case `view.setCenter(ol.proj.fromLonLat(entry.c))`: // Line ~1257
+					return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
 				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`: // Line ~1314
@@ -548,6 +565,8 @@
 					return `${match} if (guid !== $('.info').attr('data-guid')) { return; }`;
 				case `delete cooldowns[guid]`: // Line ~1532
 					return `${match}; manageControls();`;
+				case `function closeDrawSlider() {`: // Line ~1558
+					return `${match} window.closePopupDecorator(closePopup);`;
 				case `makeEntry(e, data)`: // Line ~1658
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `view.calculateExtent(map.getSize()`: // Line ~1872, 1873
@@ -578,26 +597,29 @@
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
+			`(closePopup\\(\\$\\('\\.info'\\)\\))`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
-			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
+			`(if \\(\\$\\('\\.attack-slider-wrp'\\)\\.hasClass\\('hidden'\\)\\) {)`,
 			`(explodeRange\\(item\\.l\\))`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
+			`(view\\.setCenter\\(ol\\.proj\\.fromLonLat\\(entry\\.c\\)\\))`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
 			`(function update\\(\\) {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
+			`(function closeDrawSlider\\(\\) {)`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
-			`(z: view.getZoom\\(\\))`,
+			`(z: view\\.getZoom\\(\\))`,
 			`(if \\(area < 1\\))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 30;
+		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -651,7 +673,7 @@
 					this.isCaptured = pointData.u.c;
 
 					drawButton.removeAttribute('sbgcui-possible-lines');
-					this.update(pointData.co);
+					this.updateCores(pointData.co);
 
 					if (this.owner == player.name) { this.getCaptureDate(); }
 				}
@@ -774,7 +796,7 @@
 					});
 				}
 
-				update(cores) {
+				updateCores(cores) {
 					cores.forEach(core => {
 						this.cores[core.g] = {
 							energy: core.e,
@@ -800,6 +822,16 @@
 							drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
 						});
 					}
+				}
+
+				updateDrawings(endPointGuid, regionsCreated) {
+					this.lines.out += 1;
+					this.regionsAmount += regionsCreated;
+					this.possibleLines = this.possibleLines.filter(line => line.guid != endPointGuid);
+					drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
+					linesOutSpan.innerText = this.lines.out;
+					regionsAmountSpan.innerText = this.regionsAmount;
+					pointPopup.dispatchEvent(new Event('lineDrawn'));
 				}
 
 				selectCore(type, currentLevel) {
@@ -828,6 +860,7 @@
 				constructor(pointData) { // Чистый ответ сервера или объект Point.
 					this.cores = pointData.co ?? pointData.coresAmount;
 					this.energy = pointData.e ?? pointData.energy;
+					this.guid = pointData.g ?? pointData.guid;
 					this.level = pointData.l ?? pointData.level;
 					this.lines = {
 						in: pointData.li?.i ?? pointData.lines.in,
@@ -839,12 +872,14 @@
 				update(pointData) {
 					this.cores = pointData.co ?? pointData.coresAmount ?? this.cores;
 					this.energy = pointData.e ?? pointData.energy ?? this.energy;
+					this.guid = pointData.g ?? pointData.guid ?? this.guid;
 					this.level = pointData.l ?? pointData.level ?? this.level;
 					this.lines = {
 						in: pointData.li?.i ?? pointData.lines?.in ?? this.lines.in,
-						in: pointData.li?.o ?? pointData.lines?.out ?? this.lines.out,
+						out: pointData.li?.o ?? pointData.lines?.out ?? this.lines.out,
 					};
 					this.timestamp = Date.now();
+					pointsSource.getFeatureById(this.guid)?.changed();
 				}
 
 				get linesAmount() {
@@ -1009,33 +1044,36 @@
 			const attackButton = document.querySelector('#attack-menu');
 			const attackSlider = document.querySelector('.attack-slider-wrp');
 			const blContainer = document.querySelector('.bottom-container');
-			const drawButton = document.querySelector('#draw');
-			const drawSlider = document.querySelector('.draw-slider-wrp');
-			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const catalysersList = document.querySelector('#catalysers-list');
 			const coresList = document.querySelector('#cores-list');
-			const refsList = document.querySelector('#refs-list');
+			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const discoverButton = document.querySelector('#discover');
-			const inventoryButton = document.querySelector('#ops');
+			const drawButton = document.querySelector('#draw');
+			const drawSlider = document.querySelector('.draw-slider-wrp');
 			const invCloseButton = document.querySelector('#inventory__close');
+			const inventoryButton = document.querySelector('#ops');
 			const inventoryContent = document.querySelector('.inventory__content');
 			const inventoryPopup = document.querySelector('.inventory.popup');
 			const invTotalSpan = document.querySelector('#self-info__inv');
 			const leaderboardPopup = document.querySelector('.leaderboard.popup');
 			const notifsButton = document.querySelector('#notifs-menu');
+			const linesOutSpan = document.querySelector('#i-stat__line-out');
 			const pointCores = document.querySelector('.i-stat__cores');
+			const pointEnergyValue = document.createElement('span');
 			const pointImage = document.querySelector('#i-image');
 			const pointImageBox = document.querySelector('.i-image-box');
-			const pointEnergyValue = document.createElement('span');
 			const pointLevelSpan = document.querySelector('#i-level');
 			const pointOwnerSpan = document.querySelector('#i-stat__owner');
-			const pointTitleSpan = document.querySelector('#i-title');
 			const pointPopup = document.querySelector('.info.popup');
 			const pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
+			const pointTitleSpan = document.querySelector('#i-title');
 			const profileNameSpan = document.querySelector('#pr-name');
 			const profilePopup = document.querySelector('.profile.popup');
 			const profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
+			const refsAmount = document.querySelector('#i-ref');
+			const refsList = document.querySelector('#refs-list');
 			const regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
+			const regionsAmountSpan = document.querySelector('#i-stat__region');
 			const selfExpSpan = document.querySelector('#self-info__exp');
 			const selfLvlSpan = document.querySelector('#self-info__explv');
 			const selfNameSpan = document.querySelector('#self-info__name');
@@ -1062,6 +1100,7 @@
 			let { excludedCores, isMainToolbarOpened, isRotationLocked, isStarMode, lastUsedCatalyser, starModeTarget, versionWarns } = state;
 			const uniques = { c: new Set(), v: new Set() };
 			const inview = {};
+			const pointsSource = map.getLayers().getArray().find(layer => layer.get('name') == 'points').getSource();
 
 			const percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
@@ -1070,6 +1109,9 @@
 
 
 			isStarMode = isStarMode && starModeTarget != null;
+
+			window.closePopupDecorator = closePopupDecorator;
+			window.sbgcuiHighlightFeature = highlightFeature;
 
 
 			async function getSelfData() {
@@ -1485,6 +1527,11 @@
 				return ol.sphere.getLength(line);
 			}
 
+			function isPointInRange(feature) {
+				const pointCoords = ol.proj.toLonLat(feature.getGeometry().getCoordinates());
+				return getDistance(pointCoords) < PLAYER_RANGE;
+			}
+
 			function calcPlayingTime(regDateString) {
 				const regDate = Date.parse(regDateString);
 				const dateNow = Date.now();
@@ -1661,7 +1708,7 @@
 												const isFirstCore = cores.length == 1;
 												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
-												lastOpenedPoint.update(cores);
+												lastOpenedPoint.updateCores(cores);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
 												logAction({ type: actionType, coords, point: guid, title });
@@ -1674,7 +1721,7 @@
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 												const { coords, guid: point, title } = lastOpenedPoint;
 
-												lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
+												lastOpenedPoint.updateCores([parsedResponse.c], parsedResponse.l);
 												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
 
 												logAction({ type: 'upgrade', coords, point, title });
@@ -1748,6 +1795,10 @@
 												// Чистим лут от удалённых предметов, иначе основной скрипт добавит их в кэш и слайдеры.
 												parsedResponse.loot.forEach(item => { item.a -= deletedItems[item.t]?.[item.g]?.amount ?? 0; });
 												parsedResponse.loot = parsedResponse.loot.filter(item => item.a > 0);
+
+												// Чтобы помигать счётчиком на карточке точки.
+												if (parsedResponse.loot.find(item => item.t == 3)) { window.dispatchEvent(new Event('refAquired')); }
+
 
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
@@ -1841,6 +1892,9 @@
 												const distance = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.distance;
 
 												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
+
+												lastOpenedPoint.updateDrawings(to, regions.length);
+												inview[from]?.update({ lines: { out: inview[from].lines.out + 1 } });
 											} else if ('data' in parsedResponse) {
 												const isPossibleLinesCheck = url.searchParams.get('sbgcuiPossibleLinesCheck') != null;
 
@@ -1911,11 +1965,11 @@
 										case '/api/repair':
 											if ('data' in parsedResponse) {
 												const guid = JSON.parse(options.body).guid;
-												if (isPointPopupOpened) { lastOpenedPoint.update(parsedResponse.data); }
+												if (isPointPopupOpened) { lastOpenedPoint.updateCores(parsedResponse.data); }
 												if (guid in inview) {
 													const cores = parsedResponse.data.reduce((acc, curr) => { acc[curr.g] = { energy: curr.e, level: curr.l }; return acc; }, {});
 													const totalEnergy = Point.calculateTotalEnergy(cores);
-													inview[guid].energy = totalEnergy;
+													inview[guid]?.update({ energy: totalEnergy });
 												}
 											}
 											break;
@@ -1999,6 +2053,31 @@
 					};
 
 					return toastify(options);
+				}
+			}
+
+			function closePopupDecorator(closePopup) {
+				switch (config.drawing.returnToPointInfo) {
+					case 'off':
+						closePopup($(pointPopup)); // Оригинальная функция работает с объектом JQ.
+						break;
+					case 'always':
+						pointPopup.classList.remove('hidden');
+						break;
+					case 'discoverable':
+						const guid = lastOpenedPoint.guid;
+						const point = pointsSource.getFeatureById(guid);
+						const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid]?.t || 0;
+						const isInRange = isPointInRange(point);
+						const isDiscoverable = new Date(cooldown) - Date.now() <= 0;
+
+						if (isInRange && isDiscoverable) {
+							pointPopup.classList.remove('hidden');
+						} else {
+							closePopup($(pointPopup));
+						}
+
+						break;
 				}
 			}
 
@@ -2312,7 +2391,7 @@
 					return false;
 				});
 
-				document.querySelector('.inventory__tab[data-tab="3"]').addEventListener('click', event => {
+				document.querySelector('.inventory__tab[data-tab="3"]').addEventListener('click', () => {
 					let counter = document.querySelector('.inventory__tab[data-tab="3"] > .inventory__tab-counter');
 					let refsAmount = JSON.parse(localStorage.getItem('inventory-cache')).reduce((acc, item) => item.t == 3 ? acc + item.a : acc, 0);
 					let uniqueRefsAmount = inventoryContent.childNodes.length;
@@ -2368,6 +2447,18 @@
 				portrait.addEventListener('change', () => {
 					portrait.matches ? view.setTopPadding() : view.removePadding();
 					view.setCenter(playerFeature.getGeometry().getCoordinates());
+				});
+
+				window.addEventListener('refAquired', () => {
+					refsAmount.classList.add('sbgcui_heartBeat');
+				});
+
+				refsAmount.addEventListener('animationend', () => {
+					refsAmount.classList.remove('sbgcui_heartBeat');
+				});
+
+				pointPopup.addEventListener('pointPopupClosed', () => {
+					refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 			}
 
@@ -2495,7 +2586,7 @@
 					//speed: 200,
 					//perPage: 2,
 				};
-				
+
 				window.highlightFeature = highlightFeature;
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
@@ -3398,82 +3489,90 @@
 				{
 					let star = document.createElement('button');
 					let favsList = document.createElement('div');
-					let favsListHeader = document.createElement('h3');
-					let favsListDescription = document.createElement('h6');
+					let favsListHeader = document.createElement('header');
+					let favsListHeaderTitle = document.createElement('h3');
+					let favsListHeaderSubtitle = document.createElement('h6');
 					let favsListContent = document.createElement('ul');
 					let isFavsListOpened = false;
 
 
 					function fillFavsList() {
+						if (Object.keys(favorites).length == 0) { return; }
+
 						let favs = [];
+						// Из объекта с избранным удаляются неактивные записи (убрана звёздочка), значения сортируются по алфавиту, все данные кроме гуидов удаляются.
+						// Результат - массив гуидов, отсортированный по названиям соответствующих им точек.
+						// В конце функции список будет снова отсортирован (после того, как будут запрошены данные о каждой точке) по оставшимся дискаверам/кулдауну.
+						// Конечный результат - алфавитный список, в котором наверху находятся точки с активным кулдауном.
+						const activeFavoritesGuidsByName =
+							Object.entries(favorites)
+								.filter(entry => entry[1].isActive)
+								.sort((a, b) => a[1].name.localeCompare(b[1].name))
+								.map(entry => entry[0]);
 
 						favsListContent.innerHTML = '';
 
-						if (Object.keys(favorites).length == 0) { return; }
+						activeFavoritesGuidsByName.forEach(guid => {
+							let li = document.createElement('li');
+							let pointLink = document.createElement('span');
+							let pointName = document.createElement('span');
+							let deleteButton = document.createElement('button');
+							let pointData = document.createElement('div');
 
-						for (let guid in favorites) {
-							if (favorites[guid].isActive) {
-								let li = document.createElement('li');
-								let pointLink = document.createElement('span');
-								let pointName = document.createElement('span');
-								let deleteButton = document.createElement('button');
-								let pointData = document.createElement('div');
+							pointName.innerText = favorites[guid].name;
+							pointLink.appendChild(pointName);
+							pointLink.addEventListener('click', () => { window.showInfo(guid); });
 
-								pointName.innerText = favorites[guid].name;
-								pointLink.appendChild(pointName);
-								pointLink.addEventListener('click', () => { window.showInfo(guid); });
+							deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
+							deleteButton.addEventListener('click', _ => {
+								favorites[guid].isActive = 0;
+								favorites.save();
+								li.removeAttribute('sbgcui_active', '');
+								li.classList.add('sbgcui_hidden');
+							});
 
-								deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
-								deleteButton.addEventListener('click', _ => {
-									favorites[guid].isActive = 0;
-									favorites.save();
-									li.removeAttribute('sbgcui_active', '');
-									li.classList.add('sbgcui_hidden');
-								});
+							pointData.classList.add('sbgcui_favs-li-data');
 
-								pointData.classList.add('sbgcui_favs-li-data');
+							li.classList.add('sbgcui_favs-li');
+							li.setAttribute('sbgcui_active', '');
 
-								li.classList.add('sbgcui_favs-li');
-								li.setAttribute('sbgcui_active', '');
+							let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
+							let discoveriesLeft = favorites[guid].discoveriesLeft;
 
-								let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
-								let discoveriesLeft = favorites[guid].discoveriesLeft;
+							if (hasActiveCooldown) {
+								pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
+								pointLink.sbgcuiCooldown = favorites[guid].cooldown;
 
-								if (hasActiveCooldown) {
-									pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
-									pointLink.sbgcuiCooldown = favorites[guid].cooldown;
-
-									let intervalID = setInterval(() => {
-										if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
-											pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
-										} else {
-											clearInterval(intervalID);
-										}
-									}, 1000);
-								} else if (discoveriesLeft) {
-									pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
-									pointLink.discoveriesLeft = discoveriesLeft;
-								}
-
-								li.append(deleteButton, pointLink, pointData);
-								favs.push(li);
-
-								getPointData(guid)
-									.then(data => {
-										if (!data) { return; }
-
-										const { co: cores, g: guid, l: level, li: lines, t: title, te: team } = data;
-										const energy = Math.round(data.e);
-										const inventoryCache = JSON.parse(localStorage.getItem('inventory-cache'));
-										const isAllied = team == player.team;
-										const refs = inventoryCache.find(item => item.l == guid)?.a ?? 0;
-
-										pointName.innerText = `[${level}] ${title}`;
-										pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
-										pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
-									});
+								let intervalID = setInterval(() => {
+									if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
+										pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
+									} else {
+										clearInterval(intervalID);
+									}
+								}, 1000);
+							} else if (discoveriesLeft) {
+								pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
+								pointLink.discoveriesLeft = discoveriesLeft;
 							}
-						}
+
+							li.append(deleteButton, pointLink, pointData);
+							favs.push(li);
+
+							getPointData(guid)
+								.then(data => {
+									if (!data) { return; }
+
+									const { co: cores, g: guid, l: level, li: lines, t: title, te: team } = data;
+									const energy = Math.round(data.e);
+									const inventoryCache = JSON.parse(localStorage.getItem('inventory-cache'));
+									const isAllied = team == player.team;
+									const refs = inventoryCache.find(item => item.l == guid)?.a ?? 0;
+
+									pointName.innerText = `[${level}] ${title}`;
+									pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
+									pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
+								});
+						});
 
 						favs.sort((a, b) => {
 							a = a.childNodes[1].sbgcuiCooldown || a.childNodes[1].discoveriesLeft;
@@ -3487,13 +3586,15 @@
 
 					favsList.classList.add('sbgcui_favs', 'sbgcui_hidden');
 					favsListHeader.classList.add('sbgcui_favs-header');
-					favsListDescription.classList.add('sbgcui_favs-descr');
+					favsListHeaderTitle.classList.add('sbgcui_favs-header-title');
+					favsListHeaderSubtitle.classList.add('sbgcui_favs-header-subtitle');
 					favsListContent.classList.add('sbgcui_favs-content');
 
-					favsListHeader.innerText = 'Избранные точки';
-					favsListDescription.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
+					favsListHeaderTitle.innerText = 'Избранные точки';
+					favsListHeaderSubtitle.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
 
-					favsList.append(favsListHeader, favsListDescription, favsListContent);
+					favsListHeader.append(favsListHeaderTitle, favsListHeaderSubtitle);
+					favsList.append(favsListHeader, favsListContent);
 
 					star.classList.add('fa', 'fa-solid-star', 'sbgcui_favs_star');
 					star.addEventListener('click', () => {
@@ -4318,11 +4419,6 @@
 					return cooldown?.t == undefined || (cooldown.t <= now && cooldown.c > 0);
 				}
 
-				function isPointInRange(point) {
-					const pointCoords = ol.proj.toLonLat(point.getGeometry().getCoordinates());
-					return getDistance(pointCoords) < PLAYER_RANGE;
-				}
-
 				function getPointsInRange() {
 					const playerCoords = playerFeature.getGeometry().getCoordinates();
 					const playerPixel = map.getPixelFromCoordinate(playerCoords);
@@ -4608,7 +4704,7 @@
 
 			/* Показ опыта за снос */
 			{
-				function openHandler() {
+				function updateReward() {
 					destroyRewardDiv.innerText = `${rewardText}: ${formatter.format(lastOpenedPoint.destroyReward)} ${i18next.t('units.pts-xp')}`;
 				}
 
@@ -4622,7 +4718,9 @@
 
 				pointStat.insertBefore(destroyRewardDiv, pointControls);
 
-				pointPopup.addEventListener('pointPopupOpened', openHandler);
+				pointPopup.addEventListener('pointPopupOpened', updateReward);
+				pointPopup.addEventListener('pointRepaired', updateReward);
+				pointPopup.addEventListener('lineDrawn', updateReward);
 			}
 
 
@@ -5076,6 +5174,12 @@
 								feature.setProperties({ amount, mapCoords, pointGuid, title });
 
 								pointsWithRefsSource.addFeature(feature);
+
+								getPointData(pointGuid).then(data => {
+									// Приводим к числу, т.к. у пустой точки команда null вместо 0,
+									// и при обновлении значения с начального undefined на null, OL не обновляет фичу.
+									feature.set('team', +data.te);
+								});
 							});
 
 							map.on('click', mapClickHandler);
@@ -5093,19 +5197,21 @@
 					name: 'sbgcui_points_with_refs',
 					source: pointsWithRefsSource,
 					style: (feature, resolution) => {
-						const { amount, isSelected, mapCoords, title } = feature.getProperties();
+						const { amount, isSelected, mapCoords, team, title } = feature.getProperties();
+						const fillColor = () => isSelected ? '#BB7100' : (team == undefined ? '#11111180' : team == 0 ? '#66666680' : window.TeamColors[team].fill);
+						const strokeColor = () => team == undefined ? '#66666680' : team == 0 ? '#CCCCCC80' : window.TeamColors[team].stroke;
 						const zoom = view.getZoom();
 						const markerSize = zoom >= 16 ? 20 : 20 * resolution / 2.5;
 						const markerStyle = new ol.style.Style({
 							geometry: new ol.geom.Circle(mapCoords, isSelected ? markerSize * 1.4 : markerSize),
-							fill: new ol.style.Fill({ color: isSelected ? '#BB7100' : '#CCC' }),
-							stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 3 }),
+							fill: new ol.style.Fill({ color: fillColor() }),
+							stroke: new ol.style.Stroke({ color: strokeColor(), width: isSelected ? 4 : 3 }),
 							zIndex: isSelected ? 3 : 1,
 						});
 						const amountStyle = new ol.style.Style({
 							text: new ol.style.Text({
 								fill: new ol.style.Fill({ color: '#000' }),
-								font: `${zoom >= 15 ? 16 : 12}px Manrope`,
+								font: `${zoom >= 15 ? 14 : 12}px Manrope`,
 								stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
 								text: zoom >= 15 ? String(amount) : null,
 							}),
