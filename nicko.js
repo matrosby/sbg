@@ -554,7 +554,7 @@
 				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
 				case `view.setCenter(ol.proj.fromLonLat(entry.c))`: // Line ~1257
-					//return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
+					return `${match};`;
 				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`: // Line ~1314
