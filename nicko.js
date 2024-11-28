@@ -554,7 +554,7 @@
 				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
 				case `view.setCenter(ol.proj.fromLonLat(entry.c))`: // Line ~1257
-					return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
+					//return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
 				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`: // Line ~1314
@@ -5661,7 +5661,7 @@
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
-								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightFeature(undefined, coords); };
 							}
 							destroyNotifsToasts.add(toast);
 
