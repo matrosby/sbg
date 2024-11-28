@@ -5661,7 +5661,7 @@
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
-								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightFeature(undefined, coords); };
 							}
 							destroyNotifsToasts.add(toast);
 
