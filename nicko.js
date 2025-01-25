@@ -539,7 +539,7 @@
 				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
 				case `view.setCenter(ol.proj.fromLonLat(entry.c))`: // Line ~1257
-					//return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
+					return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
 				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`: // Line ~1314
@@ -2332,9 +2332,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
-				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
+				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
+				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2710,15 +2710,15 @@
 				});
 
 				window.attack_slider.options = {
-					//speed: 200,
+					speed: 200,
 				};
 				window.deploy_slider.options = {
-					//speed: 200,
+					speed: 200,
 				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
-					//speed: 200,
+					speed: 200,
 					//perPage: 2,
 				};
 
@@ -4307,7 +4307,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						//highlightFeature(chosenFeature, undefined, { once: true });
+						highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
@@ -4334,7 +4334,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							//highlightFeature(feature, undefined, { once: true });
+							highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4623,7 +4623,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					//highlightFeature(nextPoint, undefined, { once: true });
+					highlightFeature(nextPoint, undefined, { once: true });
 				}
 
 				function toggleArrowVisibility() {
