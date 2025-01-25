@@ -2709,15 +2709,15 @@
 				});
 
 				window.attack_slider.options = {
-					speed: 200,
+					//speed: 200,
 				};
 				window.deploy_slider.options = {
-					speed: 200,
+					//speed: 200,
 				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
-					speed: 200,
+					//speed: 200,
 					//perPage: 2,
 				};
 
@@ -4306,7 +4306,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						highlightFeature(chosenFeature, undefined, { once: true });
+						//highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
@@ -4333,7 +4333,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							highlightFeature(feature, undefined, { once: true });
+							//highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4622,7 +4622,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					highlightFeature(nextPoint, undefined, { once: true });
+					//highlightFeature(nextPoint, undefined, { once: true });
 				}
 
 				function toggleArrowVisibility() {
