@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.75
+// @version      1.14.71
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -12,7 +12,7 @@
 // @iconURL      https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
 // ==/UserScript==
 
-(async function () {
+(function () {
 	'use strict';
 
 	if (window.location.pathname.startsWith('/login')) { return; }
@@ -24,7 +24,6 @@
 	if (/firefox/i.test(window.navigator.userAgent) == false) {
 		for (let i = 0; i <= 100; i += 1) { window.navigator.geolocation.clearWatch(i); }
 	}
-
 
 	const logsNerrors = [];
 	const pushMessage = messages => {
@@ -43,14 +42,29 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.75';
+	const ACTIONS_REWARDS = { destroy: { region: 125 , line: 45 , core: 10  } };
+	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
+	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
+	const LINES_LIMIT = { out: 30 };
+	const DISCOVERY_COOLDOWN = 90;
+	const HIGHLEVEL_MARKER = 9;
+	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
+	const INVENTORY_LIMIT = 3000;
+	const INVIEW_MARKERS_MAX_ZOOM = 16;
+	const INVIEW_POINTS_DATA_TTL = 7000;
+	const INVIEW_POINTS_LIMIT = 100;
+	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
+	const LATEST_KNOWN_VERSION = '0.4.3';
+	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
+	const MAX_DISPLAYED_CLUSTER = 8;
+	const MIN_FREE_SPACE = 100;
+	const PLAYER_RANGE = 45;
+	const TILE_CACHE_SIZE = 2048;
+	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
+	const USERSCRIPT_VERSION = '1.14.71';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
-	const {
-		ACTIONS_REWARDS, CORES_ENERGY, CORES_LIMITS, LINES_LIMIT, DISCOVERY_COOLDOWN, HIGHLEVEL_MARKER, HIT_TOLERANCE, INVENTORY_LIMIT,
-		INVIEW_MARKERS_MAX_ZOOM, INVIEW_POINTS_DATA_TTL, INVIEW_POINTS_LIMIT, ITEMS_TYPES, LATEST_KNOWN_VERSION, LEVEL_TARGETS,
-		MAX_DISPLAYED_CLUSTER, MIN_FREE_SPACE, PLAYER_RANGE, TILE_CACHE_SIZE, POSSIBLE_LINES_DISTANCE_LIMIT, BLAST_ANIMATION_DURATION
-	} = await fetch(`${HOME_DIR}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR}/const.json.\n\n${error.message}`); });
+	const BLAST_ANIMATION_DURATION = 800;
 
 
 	const config = {}, state = {}, favorites = {};
@@ -539,7 +553,7 @@
 				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
 				case `view.setCenter(ol.proj.fromLonLat(entry.c))`: // Line ~1257
-					//return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
+					return `${match};`;
 				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`: // Line ~1314
@@ -642,6 +656,7 @@
 				constructor(pointData) {
 					this.coords = pointData.c;
 					this.guid = pointData.g;
+					this.level = pointData.l;
 					this.team = pointData.te;
 					this.title = pointData.t;
 					this.owner = pointData.o;
@@ -712,12 +727,6 @@
 
 				get coresAmount() {
 					return Object.keys(this.cores).length;
-				}
-
-				get level() {
-					const coresTotalLevels = Object.values(this.cores).reduce((acc, core) => acc + core.level, 0);
-					const emptySlotsTotalLevels = (6 - this.coresAmount);
-					return Math.trunc((coresTotalLevels + emptySlotsTotalLevels) / 6);
 				}
 
 				get linesAmount() {
@@ -1026,127 +1035,6 @@
 				}
 			}
 
-			class RequestLog {
-				constructor(url, options, storedData) {
-					if (storedData != undefined) { Object.assign(this, storedData); return; }
-
-					this.time = { request: Date.now(), response: undefined };
-					this.request = { url, options };
-					this.status = undefined;
-					this.statusText = undefined;
-					this.response = undefined;
-					this.error = undefined;
-				}
-
-				static preCachedLogs = [];
-				static storageName = 'sbgcui_network-log';
-
-				static replacer(key, value) {
-					if (key == 'authorization') { return 'hidden'; }
-
-					// Для красоты вывода, иначе при сериализации всего объекта
-					// уже сериализированное тело запроса будет заэскейплено.
-					if (typeof value == 'string') {
-						try {
-							const parsed = JSON.parse(value);
-							return parsed;
-						} catch (error) {
-							return value;
-						}
-					}
-
-					return value;
-				}
-
-				static get fullLog() {
-					let cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
-					cachedLogs = cachedLogs.map(log => new RequestLog(undefined, undefined, log));
-					cachedLogs.push(...RequestLog.preCachedLogs);
-					return cachedLogs;
-				}
-
-				save() {
-					RequestLog.preCachedLogs.push(this);
-					if (RequestLog.preCachedLogs.length >= 100) {
-						let cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
-						cachedLogs.push(...RequestLog.preCachedLogs);
-						let json = JSON.stringify(cachedLogs);
-
-						RequestLog.preCachedLogs = [];
-
-						try {
-							sessionStorage.setItem(RequestLog.storageName, json);
-						} catch (error) {
-							// Максимальная длина всех строк, которые хранятся в SessionStorage, - 5242880 (имена ключей SS тоже учитываются).
-							// В зависимости от запроса, логи имеют разный размер, но ориентировочно это 1800-5000 логов.
-							// Приходится удалять самые старые записи чтобы не было переполнения и ошибки.
-							const storageLength = 5242880;
-							const restKeys = Object.keys(sessionStorage).filter(key => key != RequestLog.storageName);
-							const restKeysLength = restKeys.reduce((acc, key) => acc + sessionStorage.getItem(key).length, 0) + restKeys.join('').length;
-							const availableLength = storageLength - restKeysLength - RequestLog.storageName.length;
-
-							if (availableLength <= 2) { return; } // 2 - длина сериализированного пустого массива [].
-							
-							while (availableLength - json.length < 0) {
-								cachedLogs = cachedLogs.slice(Math.min(300, Math.ceil(cachedLogs.length / 2)));
-								json = JSON.stringify(cachedLogs);
-							}
-							
-							sessionStorage.setItem(RequestLog.storageName, json);
-						}
-					}
-				}
-
-				setResponse(response) {
-					this.time.response = Date.now();
-					// Клонирование объекта, т.к. ответ может быть подменён.
-					this.response = JSON.parse(JSON.stringify(response));
-				}
-
-				setStatus(code, text) {
-					this.status = code;
-					this.statusText = text;
-				}
-
-				setError(error) {
-					if (this.status != undefined && this.time.response == undefined) {
-						this.time.response = Date.now();
-					}
-
-					switch (typeof error) {
-						case 'object':
-							this.error = { name: error.name, message: error.message };
-							break;
-						case 'string':
-							this.error = { message: error };
-							break;
-					}
-				}
-
-				get isApiError() {
-					return this.response?.error != undefined;
-				}
-
-				get formattedRequest() {
-					return JSON.stringify(this.request, RequestLog.replacer, 2);
-				}
-
-				get formattedResponse() {
-					return JSON.stringify(this.response, RequestLog.replacer, 2);
-				}
-
-				get formattedError() {
-					let message = '';
-					if (this.error.name) { message += `[${this.error.name}] `; }
-					if (this.error.message) { message += `${this.error.message}`; }
-					return message;
-				}
-
-				get responseTime() {
-					return this.time.response - this.time.request;
-				}
-			}
-
 
 			window.fetch = fetchDecorator(window.fetch);
 			window.Toastify = toastifyDecorator(window.Toastify);
@@ -1202,8 +1090,6 @@
 			let isleaderboardPopupOpened = !leaderboardPopup.classList.contains('hidden');
 			let isSettingsMenuOpened = false;
 			let isRefsViewerOpened = false;
-			let isLogsViewerOpened = false;
-			let isFavsListOpened = false;
 			let isClusterOverlayOpened = false;
 			let isInvClearInProgress = false;
 
@@ -1789,27 +1675,16 @@
 								break;
 						}
 
-						const log = new RequestLog(url.pathname + url.search, options);
-
 						fetch(url.pathname + url.search, options)
 							.then(async response => {
-								log.setStatus(response.status, response.statusText);
-
 								if (!url.pathname.match(/^\/api\//)) {
 									resolve(response);
-									// Ответы сохраняются только от API, содержимое прочих не важно,
-									// но сам факт запроса и ответа должен быть в логе.
-									log.setResponse('--- data not stored ---');
-									log.save();
 									return;
 								}
 
-								const clonedResponse = response.clone();
+								let clonedResponse = response.clone();
 
 								clonedResponse.json().then(async parsedResponse => {
-									log.setResponse(parsedResponse);
-									log.save();
-
 									switch (url.pathname) {
 										case '/api/point':
 											if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
@@ -1828,15 +1703,14 @@
 										case '/api/deploy':
 											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
 												const cores = parsedResponse.data.co;
+												const { coords, guid, title, isCaptured } = lastOpenedPoint;
+												const isFirstCore = cores.length == 1;
+												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
 												lastOpenedPoint.updateCores(cores);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
-												const { coords, guid, level, title, isCaptured } = lastOpenedPoint;
-												const isFirstCore = cores.length == 1;
-												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
-
-												logAction({ type: actionType, coords, level, point: guid, title });
+												logAction({ type: actionType, coords, point: guid, title });
 
 												if (inview[guid] == undefined) {
 													inview[guid] = new InviewPoint(lastOpenedPoint);
@@ -1844,12 +1718,12 @@
 													inview[guid].update(lastOpenedPoint);
 												}
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
+												const { coords, guid: point, title } = lastOpenedPoint;
+
 												lastOpenedPoint.updateCores([parsedResponse.c], parsedResponse.l);
 												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
 
-												const { coords, level, guid: point, title } = lastOpenedPoint;
-
-												logAction({ type: 'upgrade', coords, level, point, title });
+												logAction({ type: 'upgrade', coords, point, title });
 											}
 											break;
 										case '/api/attack2':
@@ -1863,10 +1737,8 @@
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
-													const oldestLineDays = Math.trunc(Math.max(...parsedResponse.l.map(line => Date.now() - new Date(line.created_at)), 0) / 1000 / 60 / 60 / 24);
-													const oldestRegionDays = Math.trunc(Math.max(...parsedResponse.r.map(region => Date.now() - new Date(region.created_at)), 0) / 1000 / 60 / 60 / 24);
 
-													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, oldestLineDays, oldestRegionDays, xp });
+													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, xp });
 													destroyedPoints.forEach(point => {
 														const guid = point.guid;
 														delete inview[guid];
@@ -2134,17 +2006,11 @@
 									}
 								}).catch(error => {
 									console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
-									log.setError(error);
-									log.save();
 								}).finally(() => {
 									resolve(response);
 								});
 							})
-							.catch(error => {
-								log.setError(error);
-								log.save();
-								reject(error);
-							});
+							.catch(error => { reject(error); });
 					});
 				}
 			}
@@ -2245,19 +2111,20 @@
 				});
 			}
 
-			function isAnyOverlayActive() {
-				const isAnyDefaultPopupOpened = Array.from(document.querySelectorAll('.popup')).some(popup => !popup.classList.contains('hidden'));
+			function isAnyPopupOrOverlayOpened() {
 				return (
-					isAnyDefaultPopupOpened ||
-					isDrawSliderOpened ||
 					isAttackSliderOpened ||
 					isClusterOverlayOpened ||
+					isDrawSliderOpened ||
+					isInventoryPopupOpened ||
+					isPointPopupOpened ||
+					isProfilePopupOpened ||
+					isleaderboardPopupOpened ||
 					isSettingsMenuOpened ||
-					isFavsListOpened ||
-					isLogsViewerOpened ||
 					isRefsViewerOpened
 				);
 			}
+
 
 			/* Данные о себе и версии игры */
 			{
@@ -2666,8 +2533,6 @@
 					'sbgcui.lines': 'Линии',
 					'sbgcui.region': 'Регион',
 					'sbgcui.regions': 'Регионы',
-					'sbgcui.oldestLineDays': 'Самая старая линия (дн.)',
-					'sbgcui.oldestRegionDays': 'Самый старый регион (дн.)',
 					'sbgcui.refsShort': 'СНК',
 					'sbgcui.max': 'Макс.',
 					'sbgcui.total': 'Всего',
@@ -2686,8 +2551,6 @@
 					'sbgcui.lines': 'Lines',
 					'sbgcui.region': 'Region',
 					'sbgcui.regions': 'Regions',
-					'sbgcui.oldestLineDays': 'Oldest line (days)',
-					'sbgcui.oldestRegionDays': 'Oldest region (days)',
 					'sbgcui.refsShort': 'REF',
 					'sbgcui.max': 'Max',
 					'sbgcui.total': 'Total',
@@ -3054,7 +2917,6 @@
 					setStoredInputsValues();
 
 					settingsMenu.classList.add('sbgcui_hidden');
-					isSettingsMenuOpened = false;
 				}
 
 				function onColorFilterInput(event) {
@@ -3629,6 +3491,7 @@
 					let favsListHeaderTitle = document.createElement('h3');
 					let favsListHeaderSubtitle = document.createElement('h6');
 					let favsListContent = document.createElement('ul');
+					let isFavsListOpened = false;
 
 
 					function fillFavsList() {
@@ -3741,7 +3604,6 @@
 					document.body.addEventListener('click', event => {
 						if (
 							isFavsListOpened &&
-							!event.target.closest('.info.popup') &&
 							!event.target.closest('.sbgcui_favs') &&
 							!event.target.closest('.sbgcui_favs_star')
 						) {
@@ -4585,7 +4447,7 @@
 				}
 
 				function checkPopupsAndShowPoint() {
-					!isAnyOverlayActive() && showNextPointInRange(true);
+					!isAnyPopupOrOverlayOpened() && showNextPointInRange(true);
 				}
 
 				function showNextPointInRange(isAutoShow) {
@@ -5400,9 +5262,8 @@
 			}
 
 
-			/* Логи и консоль */
+			/* Показ логов */
 			{
-				sessionStorage.removeItem(RequestLog.storageName);
 				try {
 					function clearStorage() {
 						const date = datePicker.getAttribute('min');
@@ -5423,27 +5284,7 @@
 						};
 					}
 
-					function showDevLogs() {
-						[header, tagsWrapper, logContent].forEach(element => element.classList.add('sbgcui_hidden'));
-						devLogs.classList.remove('sbgcui_hidden');
-						showConsoleLog();
-					}
-
-					function hideDevLogs() {
-						consoleContent.innerHTML = '';
-						networkContent.innerHTML = '';
-						[header, tagsWrapper, logContent].forEach(element => element.classList.remove('sbgcui_hidden'));
-						devLogs.classList.add('sbgcui_hidden');
-					}
-
-					function showConsoleLog() {
-						consoleTab.setAttribute('active', '');
-						networkTab.removeAttribute('active');
-						networkContent.classList.add('sbgcui_hidden');
-						consoleContent.classList.remove('sbgcui_hidden');
-						consoleContent.innerHTML = '';
-						networkContent.innerHTML = '';
-
+					function showConsole() {
 						logsNerrors.forEach(data => {
 							const entry = document.createElement('p');
 							const entryTime = document.createElement('span');
@@ -5459,61 +5300,28 @@
 							entryDescr.innerHTML = data.messages.join('<br>');
 
 							entry.append(entryTime, entryDescr);
-							consoleContent.prepend(entry);
+							cnslContent.prepend(entry);
 						});
+
+						[header, tagsWrapper, logContent].forEach(element => element.classList.add('sbgcui_hidden'));
+						cnslContent.classList.remove('sbgcui_hidden');
 					}
 
-					function showNetworkLog() {
-						networkTab.setAttribute('active', '');
-						consoleTab.removeAttribute('active');
-						consoleContent.classList.add('sbgcui_hidden');
-						networkContent.classList.remove('sbgcui_hidden');
-						consoleContent.innerHTML = '';
-						networkContent.innerHTML = '';
-
-						RequestLog.fullLog.forEach(log => {
-							const details = document.createElement('details');
-							const summary = document.createElement('summary');
-							const reqPre = document.createElement('pre');
-							const resPre = document.createElement('pre');
-							const errPre = document.createElement('pre');
-							const reqHeaderSpan = document.createElement('span');
-							const resHeaderSpan = document.createElement('span');
-							const errHeaderSpan = document.createElement('span');
-							const resTimeStatusSpan = document.createElement('span');
-							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hourCycle: 'h23' };
-
-							summary.innerText = `[${new Date(log.time.request).toLocaleString(i18next.language, format).replace(/,|\./, ':')}] [${log.status ?? '???'}] ${log.request.url}`;
-							reqHeaderSpan.innerText = 'REQUEST:';
-							reqPre.append(reqHeaderSpan, log.formattedRequest);
-							if (log.status != undefined) {
-								resHeaderSpan.innerText = 'RESPONSE:';
-								resTimeStatusSpan.innerText = `${log.responseTime} ms [${log.status}] ${log.statusText}`;
-								resPre.append(resHeaderSpan, resTimeStatusSpan, (log.response == undefined ? '' : log.formattedResponse));
-							}
-							if (log.error != undefined) {
-								errHeaderSpan.innerText = `ERROR:`;
-								errPre.append(errHeaderSpan, log.formattedError);
-							}
-
-							if (log.response == undefined || log.error != undefined || log.status >= 400) { summary.setAttribute('error', ''); }
-							if (log.isApiError) { summary.setAttribute('api-error', ''); }
-
-							details.append(summary, reqPre, resPre, errPre);
-							networkContent.prepend(details);
-						});
+					function hideConsole() {
+						cnslContent.innerHTML = '';
+						[header, tagsWrapper, logContent].forEach(element => element.classList.remove('sbgcui_hidden'));
+						cnslContent.classList.add('sbgcui_hidden');
 					}
 
-					function toggleDevLogs() {
-						const isDevLogsHidden = devLogs.classList.contains('sbgcui_hidden');
-						isDevLogsHidden ? showDevLogs() : hideDevLogs();
+					function toggleConsole() {
+						const isConsoleHidden = cnslContent.classList.contains('sbgcui_hidden');
+						isConsoleHidden ? showConsole() : hideConsole();
 					}
 
 					function hidePopup() {
 						popup.classList.add('sbgcui_hidden');
 						logContent.innerHTML = '';
-						hideDevLogs();
-						isLogsViewerOpened = false;
+						hideConsole();
 					}
 
 					function showPopup() {
@@ -5538,10 +5346,9 @@
 
 							popup.classList.remove('sbgcui_hidden');
 						});
-						isLogsViewerOpened = true;
 					}
 
-					function showActionsLog() {
+					function showLog() {
 						const upperBound = new Date(datePicker.value).setHours(0, 0, 0, 0);
 						const lowerBound = new Date(datePicker.value).setHours(23, 59, 59, 999);
 						const keyRange = IDBKeyRange.bound(upperBound, lowerBound);
@@ -5616,7 +5423,7 @@
 												const link = document.createElement('a');
 
 												link.innerText = guidsTitles[action.point] || action.point;
-												link.innerText += action.level != undefined ? ` [${action.type == 'discover' ? '' : '^'}${action.level}]` : '';
+												link.innerText += action.level != undefined ? ` [${action.level}]` : '';
 												link.setAttribute('data-guid', action.point);
 
 												entryDescr.appendChild(link);
@@ -5699,13 +5506,12 @@
 											}
 											case 'destroy':
 											case 'broom': {
-												const { points, oldestLineDays, oldestRegionDays, xp } = action;
+												const points = action.points;
 												const lines = action.lines instanceof Array ? action.lines.length : action.lines; // Раньше сохранялся массив.
 												const regions = action.regions instanceof Array ? action.regions.length : action.regions;
+												const xp = action.xp;
 												const linesString = `${i18next.t('sbgcui.line' + (lines > 1 ? 's' : ''))}: ${lines}`;
 												const regionsString = `${i18next.t('sbgcui.region' + (regions > 1 ? 's' : ''))}: ${regions}`;
-												const oldestLineDaysString = `${i18next.t('sbgcui.oldestLineDays')}: ${oldestLineDays}`;
-												const oldestRegionDaysString = `${i18next.t('sbgcui.oldestRegionDays')}: ${oldestRegionDays}`;
 
 												entryDescr.innerText = i18next.t('sbgcui.point' + (points.length > 1 ? 's' : '')) + ': ';
 												points.forEach((guid, index) => {
@@ -5717,15 +5523,11 @@
 													entryDescr.appendChild(link);
 													if (index < points.length - 1) { entryDescr.append(', '); }
 												});
-
 												if (lines > 0) {
 													entryDescr.appendChild(document.createElement('br'));
-													entryDescr.append(linesString);
-													if (regions > 0) { entryDescr.append(`, ${regionsString.toLowerCase()}`) }
-													if (xp != undefined) { entryDescr.append(`. XP: ${xp}`); };
-													if (oldestLineDays > 0) { entryDescr.append(document.createElement('br'), oldestLineDaysString); }
-													if (regions > 0 && oldestRegionDays > 0) { entryDescr.append(document.createElement('br'), oldestRegionDaysString); }
+													entryDescr.append(linesString, (regions > 0) ? `, ${regionsString.toLowerCase()}` : '', (xp != undefined) ? `. XP: ${xp}` : '');
 												}
+
 
 												break;
 											}
@@ -5777,21 +5579,11 @@
 						stateStore.put(state.hiddenLogs, 'hiddenLogs');
 					}
 
-					function copyLogToClipboard(event) {
-						if (event.target.closest('pre') == null) { return; }
-						const log = event.target.closest('details')?.innerText?.replace(/^(\[.+\])(.+?)(\n)/, '$1$3');
-						window.navigator.clipboard.writeText(log).then(() => { showToast('Выбранный лог скопирован в буфер обмена.'); });
-					}
-
 					const popup = await getHTMLasset('log');
 					const closeButton = popup.querySelector('.sbgcui_log-close');
 					const clearButton = popup.querySelector('.sbgcui_log-buttons-trash');
-					const devButton = popup.querySelector('.sbgcui_log-buttons-dev');
-					const devLogs = popup.querySelector('.sbgcui_log-dev');
-					const consoleContent = popup.querySelector('.sbgcui_log-dev-console');
-					const networkContent = popup.querySelector('.sbgcui_log-dev-network');
-					const consoleTab = popup.querySelector('.sbgcui_log-dev-tabs-console');
-					const networkTab = popup.querySelector('.sbgcui_log-dev-tabs-network');
+					const cnslButton = popup.querySelector('.sbgcui_log-buttons-console');
+					const cnslContent = popup.querySelector('.sbgcui_log-console');
 					const datePicker = popup.querySelector('input[type="date"]');
 					const header = popup.querySelector('.sbgcui_log-header');
 					const jumpToButton = document.querySelector('.info > .sbgcui_jumpToButton');
@@ -5810,15 +5602,12 @@
 					toolbarButton.addEventListener('click', showPopup);
 					closeButton.addEventListener('click', hidePopup);
 					clearButton.addEventListener('click', clearStorage);
-					devButton.addEventListener('click', toggleDevLogs);
-					consoleTab.addEventListener('click', showConsoleLog);
-					networkTab.addEventListener('click', showNetworkLog);
+					cnslButton.addEventListener('click', toggleConsole);
 					jumpToButton.addEventListener('click', hidePopup);
 					tagsWrapper.addEventListener('click', toggleTag);
 					logContent.addEventListener('click', showPointInfo);
 					datePicker.addEventListener('keydown', event => { event.preventDefault(); });
-					datePicker.addEventListener('change', showActionsLog);
-					networkContent.addEventListener('click', copyLogToClipboard);
+					datePicker.addEventListener('change', showLog);
 
 					toolbar.addItem(toolbarButton, 6);
 
