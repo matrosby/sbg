@@ -49,7 +49,7 @@
 		ACTIONS_REWARDS, CORES_ENERGY, CORES_LIMITS, LINES_LIMIT, DISCOVERY_COOLDOWN, HIGHLEVEL_MARKER, HIT_TOLERANCE, INVENTORY_LIMIT,
 		INVIEW_MARKERS_MAX_ZOOM, INVIEW_POINTS_DATA_TTL, INVIEW_POINTS_LIMIT, ITEMS_TYPES, LATEST_KNOWN_VERSION, LEVEL_TARGETS,
 		MAX_DISPLAYED_CLUSTER, MIN_FREE_SPACE, PLAYER_RANGE, TILE_CACHE_SIZE, POSSIBLE_LINES_DISTANCE_LIMIT, BLAST_ANIMATION_DURATION
-	} = await fetch("https://matros.by/sbg/const.json").then(res => res.json()).catch(error => { window.alert(`Ошибка при получении https://matros.by/sbg/const.json.\n\n${error.message}`); });
+	} = await fetch(`https://matros.by/sbg/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении https://matros.by/sbg/const.json.\n\n${error.message}`); });
 
 
 	const config = {}, state = {}, favorites = {};
