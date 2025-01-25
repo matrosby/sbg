@@ -18,7 +18,6 @@
 	if (window.location.pathname.startsWith('/login')) { return; }
 	if (document.querySelector('[src="intel.js"]')) { return; }
 
-	window.cuiStatus = 'loading';
 	window.stop();
 	document.open();
 	if (/firefox/i.test(window.navigator.userAgent) == false) {
@@ -5975,7 +5974,6 @@
 
 				leaderboardPopup.appendChild(searchButton);
 			}
-			window.cuiStatus = 'loaded';
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
 		}
