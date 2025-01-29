@@ -2586,11 +2586,11 @@
 				});
 
 				refsAmount.addEventListener('animationend', () => {
-					refsAmount.classList.remove('sbgcui_heartBeat');
+					//refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 
 				pointPopup.addEventListener('pointPopupClosed', () => {
-					refsAmount.classList.remove('sbgcui_heartBeat');
+					//refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 			}
 
