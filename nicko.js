@@ -2582,15 +2582,15 @@
 				});
 
 				window.addEventListener('refAquired', () => {
-					refsAmount.classList.add('sbgcui_heartBeat');
+					//refsAmount.classList.add('sbgcui_heartBeat');
 				});
 
 				refsAmount.addEventListener('animationend', () => {
-					//refsAmount.classList.remove('sbgcui_heartBeat');
+					refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 
 				pointPopup.addEventListener('pointPopupClosed', () => {
-					//refsAmount.classList.remove('sbgcui_heartBeat');
+					refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 			}
 
