@@ -1689,7 +1689,7 @@
 				view.setCenter(olCoords);
 				view.setZoom(17);
 			}
-
+/*
 			function highlightFeature(feature, coords = [], options) {
 				function animate(event) {
 					const frameState = event.frameState;
@@ -1718,7 +1718,7 @@
 
 					map.render();
 				}
-
+*/
 				function stopAnimation() {
 					ol.Observable.unByKey(listenerKey);
 					customPointsSource.removeFeature(highlighterFeature);
