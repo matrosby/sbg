@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.75
+// @version      1.14.77
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.75';
+	const USERSCRIPT_VERSION = '1.14.77';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const HOME_DIR_2 = 'https://raw.githubusercontent.com/matrosby/sbg/master';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
@@ -51,7 +51,7 @@
 		ACTIONS_REWARDS, CORES_ENERGY, CORES_LIMITS, LINES_LIMIT, DISCOVERY_COOLDOWN, HIGHLEVEL_MARKER, HIT_TOLERANCE, INVENTORY_LIMIT,
 		INVIEW_MARKERS_MAX_ZOOM, INVIEW_POINTS_DATA_TTL, INVIEW_POINTS_LIMIT, ITEMS_TYPES, LATEST_KNOWN_VERSION, LEVEL_TARGETS,
 		MAX_DISPLAYED_CLUSTER, MIN_FREE_SPACE, PLAYER_RANGE, TILE_CACHE_SIZE, POSSIBLE_LINES_DISTANCE_LIMIT, BLAST_ANIMATION_DURATION
-	} = await fetch(`${HOME_DIR_2}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR_2}/const.json.\n\n${error.message}`); });
+	} = await fetch(`${HOME_DIR}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR}/const.json.\n\n${error.message}`); });
 
 
 	const config = {}, state = {}, favorites = {};
@@ -208,6 +208,7 @@
 			},
 			ui: {
 				doubleClickZoom: 0,
+				restoreRotation: 1,
 				pointBgImage: 1,
 				pointBtnsRtl: 0,
 				pointBgImageBlur: 1,
@@ -1069,31 +1070,13 @@
 				save() {
 					RequestLog.preCachedLogs.push(this);
 					if (RequestLog.preCachedLogs.length >= 100) {
-						let cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
-						cachedLogs.push(...RequestLog.preCachedLogs);
-						let json = JSON.stringify(cachedLogs);
-
-						RequestLog.preCachedLogs = [];
+						const cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
 
 						try {
-							sessionStorage.setItem(RequestLog.storageName, json);
+							sessionStorage.setItem(RequestLog.storageName, JSON.stringify([...cachedLogs, ...RequestLog.preCachedLogs]));
+							RequestLog.preCachedLogs = [];
 						} catch (error) {
-							// Максимальная длина всех строк, которые хранятся в SessionStorage, - 5242880 (имена ключей SS тоже учитываются).
-							// В зависимости от запроса, логи имеют разный размер, но ориентировочно это 1800-5000 логов.
-							// Приходится удалять самые старые записи чтобы не было переполнения и ошибки.
-							const storageLength = 5242880;
-							const restKeys = Object.keys(sessionStorage).filter(key => key != RequestLog.storageName);
-							const restKeysLength = restKeys.reduce((acc, key) => acc + sessionStorage.getItem(key).length, 0) + restKeys.join('').length;
-							const availableLength = storageLength - restKeysLength - RequestLog.storageName.length;
-
-							if (availableLength <= 2) { return; } // 2 - длина сериализированного пустого массива [].
-							
-							while (availableLength - json.length < 0) {
-								cachedLogs = cachedLogs.slice(Math.min(300, Math.ceil(cachedLogs.length / 2)));
-								json = JSON.stringify(cachedLogs);
-							}
-							
-							sessionStorage.setItem(RequestLog.storageName, json);
+							sessionStorage.removeItem(RequestLog.storageName);
 						}
 					}
 				}
@@ -1321,18 +1304,36 @@
 					const isFilteredLoot = loot.some(item => item.isFiltered);
 					const { allied, hostile } = maxAmountInBag.references;
 					const deletedAmounts = {};
-					let pointsData = [], pointsTeams = {}, invTotal = Infinity, message = '';
+					let pointsTeams = {}, invTotal = Infinity, message = '';
 
 					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return []; }
 
 					if (!isEnoughSpace || isForceClear) {
 						const isDeleteAll = allied == 0 && hostile == 0;
 						const isDeleteNone = allied == -1 && hostile == -1;
+						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
 
-						if (!(isDeleteAll || isDeleteNone)) {
+						if (isForceClear && isDeleteSome) { // Сноски удаляются только принудительно.
+							const pointsData = [];
 							const refs = inventory.filter(e => e.t == 3);
+							let guids = refs.map(ref => ref.l);
 
-							pointsData = await Promise.all(refs.map(ref => getPointData(ref.l)));
+							while (guids.length > 0) {
+								const results = await Promise.allSettled(guids.map(guid => getPointData(guid)));
+								const rejectedGuids = [];
+
+								results.forEach((result, index) => {
+									result.status == 'fulfilled' ? pointsData.push(result.value) : rejectedGuids.push(guids[index]);
+								});
+
+								if (guids.length == rejectedGuids.length) { // На случай потери сети или серверных ошибок.
+									pointsData.length = 0;
+									break;
+								} else {
+									guids = rejectedGuids;
+								}
+							}
+
 							pointsTeams = Object.fromEntries(pointsData.map(point => [point.g, point.te]));
 						}
 
@@ -2815,6 +2816,8 @@
 					zIndex: 9
 				});
 				map.addLayer(customPointsLayer);
+
+				view.setRotation(config.ui.restoreRotation ? (state.viewRotation ?? 0) : 0);
 			}
 
 
@@ -5019,8 +5022,10 @@
 				}
 
 				function touchEndHandler() {
-					if (touches.length != 0) { window.requestEntities(); }
+					if (touches.length == 0) { return; } else { window.requestEntities(); }
+					touches = [];
 					latestTouchPoint = null;
+					database.transaction('state', 'readwrite').objectStore('state').put(view.getRotation(), 'viewRotation');
 				}
 
 				function rotationChangeHandler() {
