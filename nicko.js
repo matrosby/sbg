@@ -5055,7 +5055,7 @@
 				const jumpToButton = document.createElement('button');
 
 				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); });
+				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightFeature(undefined, lastOpenedPoint.coords); });
 				pointPopup.appendChild(jumpToButton);
 
 				try {
@@ -5874,7 +5874,7 @@
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
-								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightFeature(undefined, coords); };
 							}
 							destroyNotifsToasts.add(toast);
 
