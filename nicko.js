@@ -2771,7 +2771,7 @@
 					//perPage: 2,
 				};
 
-				window.highlightFeature = highlightFeature;
+				//window.highlightFeature = highlightFeature;
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
 
