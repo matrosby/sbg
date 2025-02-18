@@ -1890,13 +1890,6 @@
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
 
-Search within code
- 
-‎index.js
-+6
--2
-Original file line number	Diff line number	Diff line change
-@@ -1887,8 +1887,12 @@
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
