@@ -1889,13 +1889,8 @@
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
-
-													// API периодически меняется - то появляются данные о дате создания линии/региона, то исчезают. Пусть пишется на случай, если снова вернут.
-													const now = Date.now();
-													const linesCreationDates = parsedResponse.l.map(line => now - new Date(line.created_at));
-													const regionsCreationDates = parsedResponse.r.map(region => now - new Date(region.created_at));
-													const oldestLineDays = linesCreationDates.some(date => isFinite(date)) ? Math.trunc(Math.max(...linesCreationDates, 0) / 1000 / 60 / 60 / 24) : undefined;
-													const oldestRegionDays = regionsCreationDates.some(date => isFinite(date)) ? Math.trunc(Math.max(...regionsCreationDates, 0) / 1000 / 60 / 60 / 24) : undefined;
+													const oldestLineDays = Math.trunc(Math.max(...parsedResponse.l.map(line => Date.now() - new Date(line.created_at)), 0) / 1000 / 60 / 60 / 24);
+													const oldestRegionDays = Math.trunc(Math.max(...parsedResponse.r.map(region => Date.now() - new Date(region.created_at)), 0) / 1000 / 60 / 60 / 24);
 
 													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, oldestLineDays, oldestRegionDays, xp });
 													destroyedPoints.forEach(point => {
@@ -2771,7 +2766,7 @@
 					//perPage: 2,
 				};
 
-				//window.highlightFeature = highlightFeature;
+				window.highlightFeature = highlightFeature;
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
 
