@@ -5055,7 +5055,7 @@
 				const jumpToButton = document.createElement('button');
 
 				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightFeature(undefined, lastOpenedPoint.coords); });
+				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); });
 				pointPopup.appendChild(jumpToButton);
 
 				try {
