@@ -818,6 +818,7 @@
 						this.getPossibleLines().then(possibleLines => {
 							this.possibleLines = possibleLines;
 							drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
+							window.draw_slider.options.pagination = this.possibleLines.length <= 20;
 						});
 					}
 				}
@@ -3079,8 +3080,8 @@
 						brandingInput.value = hex326(player.teamColor);
 						html.style.setProperty('--sbgcui-branding-color', player.teamColor);
 					} else {
-						brandingInput.value = mapFilters.brandingColor;
-						html.style.setProperty('--sbgcui-branding-color', mapFilters.brandingColor);
+						brandingInput.value = config.mapFilters.brandingColor;
+						html.style.setProperty('--sbgcui-branding-color', config.mapFilters.brandingColor);
 					}
 				}
 
