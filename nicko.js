@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.81
+// @version      1.14.80
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -16,8 +16,7 @@
 	'use strict';
 
 	if (window.location.pathname.startsWith('/login')) { return; }
-	if (document.querySelector('[src^="intel"]')) { return; }
- 	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
+	if (document.querySelector('[src="intel.js"]')) { return; }
 
 	window.cuiStatus = 'loading';
 	window.stop();
@@ -610,7 +609,7 @@
 		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
-		fetch(`/app/${vanillaScriptSrc}`)
+		fetch('/app/script.js')
 			.then(r => r.text())
 			.then(data => {
 				const script = document.createElement('script');
