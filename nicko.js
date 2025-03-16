@@ -16,7 +16,8 @@
 	'use strict';
 
 	if (window.location.pathname.startsWith('/login')) { return; }
-	if (document.querySelector('[src="intel.js"]')) { return; }
+	if (document.querySelector('[src^="intel"]')) { return; }
+ 	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
 
 	window.cuiStatus = 'loading';
 	window.stop();
@@ -609,7 +610,7 @@
 		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
-		fetch('/app/script.js')
+		fetch(`/app/${vanillaScriptSrc}`)
 			.then(r => r.text())
 			.then(data => {
 				const script = document.createElement('script');
