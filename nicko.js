@@ -615,7 +615,7 @@
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
-				if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
+				//if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
 				document.head.appendChild(script);
 			})
 			.catch(error => {
@@ -1352,9 +1352,11 @@
 					if (!isEnoughSpace || isForceClear) {
 						const isDeleteAll = allied == 0 && hostile == 0;
 						const isDeleteNone = allied == -1 && hostile == -1;
-						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
+//						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
 
-						if (isForceClear && isDeleteSome) { // Сноски удаляются только принудительно.
+if (!(isDeleteAll || isDeleteNone)) {
+//						if (isForceClear && isDeleteSome) { 
+// Сноски удаляются только принудительно.
 							const refs = inventory.filter(e => e.t == 3);
 							const guids = refs.map(ref => ref.l);
 							const pointsData = await getMultiplePointsData(guids, undefined, forceClearButton);
