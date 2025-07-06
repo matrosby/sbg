@@ -15,7 +15,7 @@
 (async function () {
 	'use strict';
 
-	if (window.location.pathname.startsWith('/app')) { return; }
+	if (window.location.pathname.startsWith('/login')) { return; }
 	if (document.querySelector('[src^="intel"]')) { return; }
  	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
 
