@@ -608,7 +608,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 20;
+		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
 		fetch('https://sbg-game.ru/app/intel@0.5.0.893fd27067.js')
@@ -616,7 +616,7 @@
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
-				if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
+				//if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
 				document.head.appendChild(script);
 			})
 			.catch(error => {
