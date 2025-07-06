@@ -16,7 +16,7 @@
 	'use strict';
 
 	if (window.location.pathname.startsWith('/login')) { return; }
-	if (document.querySelector('[src^="intel"]')) { return; }
+	if (document.querySelector('[src^="intel@0.5.0.893fd27067"]')) { return; }
  	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
 
 	window.cuiStatus = 'loading';
