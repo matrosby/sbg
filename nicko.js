@@ -16,8 +16,9 @@
 	'use strict';
 
 	if (window.location.pathname.startsWith('/login')) { return; }
-	if (document.querySelector('[src^="intel@0.5.0.893fd27067"]')) { return; }
- 	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
+	if (document.querySelector('[src^="intel"]')) { return; }
+ 	//const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
+	const vanillaScriptSrc = 'https://sbg-game.ru/app/intel@0.5.0.893fd27067.js';
 
 	window.cuiStatus = 'loading';
 	window.stop();
