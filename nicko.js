@@ -611,7 +611,7 @@
 		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
-		fetch(`/app/intel@0.5.0.893fd27067.js`)
+		fetch('https://sbg-game.ru/app/intel@0.5.0.893fd27067.js')
 			.then(r => r.text())
 			.then(data => {
 				const script = document.createElement('script');
