@@ -608,7 +608,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 33;
+		const replacesShouldBe = 20;
 		let replacesMade = 0;
 
 		fetch('https://sbg-game.ru/app/intel@0.5.0.893fd27067.js')
