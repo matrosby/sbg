@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         SBG CUI
+// @name         SBG CUI fix
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.81
+// @version      1.14.82.fix
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -17,10 +17,9 @@
 
 	if (window.location.pathname.startsWith('/login')) { return; }
 	if (document.querySelector('[src^="intel"]')) { return; }
- 	//const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
-	const vanillaScriptSrc = 'intel@0.5.0.893fd27067.js';
+	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
 
-	window.cuiStatus = 'loading';
+    debugger
 	window.stop();
 	document.open();
 	if (/firefox/i.test(window.navigator.userAgent) == false) {
@@ -45,15 +44,14 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.80';
+	const USERSCRIPT_VERSION = '1.14.82';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	const HOME_DIR_2 = 'https://raw.githubusercontent.com/matrosby/sbg/master';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
 		ACTIONS_REWARDS, CORES_ENERGY, CORES_LIMITS, LINES_LIMIT, DISCOVERY_COOLDOWN, HIGHLEVEL_MARKER, HIT_TOLERANCE, INVENTORY_LIMIT,
 		INVIEW_MARKERS_MAX_ZOOM, INVIEW_POINTS_DATA_TTL, INVIEW_POINTS_LIMIT, ITEMS_TYPES, LATEST_KNOWN_VERSION, LEVEL_TARGETS,
 		MAX_DISPLAYED_CLUSTER, MIN_FREE_SPACE, PLAYER_RANGE, TILE_CACHE_SIZE, POSSIBLE_LINES_DISTANCE_LIMIT, BLAST_ANIMATION_DURATION
-	} = await fetch(`${HOME_DIR_2}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR_2}/const.json.\n\n${error.message}`); });
+	} = await fetch(`${HOME_DIR}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR}/const.json.\n\n${error.message}`); });
 
 
 	const config = {}, state = {}, favorites = {};
@@ -530,14 +528,12 @@
 					return `window.deploy_slider`;
 				case `const draw_slider`: // Line ~442
 					return `window.draw_slider`;
-				case `closePopup($('.info'))`: // Line ~674
-					return `$('.info').addClass('hidden');`;
+				// case `closePopup($('.info'))`: // Line ~674
+				// 	return `$('.info').addClass('hidden');`;
 				case `if (new_val < 1) new_val = 1`: // Line ~795
 					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
 					return `${match}return;`;
-				case `explodeRange(item.l)`: // Line ~1005
-					return `window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: Catalysers[item.l].range, color: '#FF0000', width: 5 + item.l / 2 })`;
 				case `$('[name="baselayer"]').on('change', e`: // Line ~1108
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`: // Line ~1244
@@ -562,6 +558,10 @@
 					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
 				case `z: view.getZoom()`: // Line ~1874
 					return `z: Math.floor(view.getZoom())`;
+				case `function explodeRange(prop) {`: // Line ~1967
+					return `${match} window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: prop.range, color: '#FF0000', width: 5 + prop.lv / 2 }); return;`;
+				case `function explodeRange(level) {`: // Line ~1967
+					return `${match} window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: Catalysers[level].range, color: '#FF0000', width: 5 + level / 2 }); return;`;
 				case `if (area < 1)`: // Line ~1972
 					return `if (area < 0)`;
 				case `makeItemTitle(item)`: // Line ~2018
@@ -589,7 +589,6 @@
 			`(closePopup\\(\\$\\('\\.info'\\)\\))`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\)\\.hasClass\\('hidden'\\)\\) {)`,
-			`(explodeRange\\(item\\.l\\))`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
 			`(view\\.setCenter\\(ol\\.proj\\.fromLonLat\\(entry\\.c\\)\\))`,
@@ -602,21 +601,23 @@
 			`(function makeEntry)`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view\\.getZoom\\(\\))`,
+			`(function explodeRange\\(prop\\) {)`,
+			`(function explodeRange\\(level\\) {)`,
 			`(if \\(area < 1\\))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 20;
+		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
-		fetch('https://sbg-game.ru/app/intel@0.5.0.893fd27067.js')
+		fetch(`/app/${vanillaScriptSrc}`)
 			.then(r => r.text())
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
-				//if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
+				//if (replacesMade != replacesShouldBe) { /*throw new Error*/ alert(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
 				document.head.appendChild(script);
 			})
 			.catch(error => {
@@ -1353,11 +1354,9 @@
 					if (!isEnoughSpace || isForceClear) {
 						const isDeleteAll = allied == 0 && hostile == 0;
 						const isDeleteNone = allied == -1 && hostile == -1;
-//						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
+						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
 
-if (!(isDeleteAll || isDeleteNone)) {
-//						if (isForceClear && isDeleteSome) { 
-// Сноски удаляются только принудительно.
+						if (isForceClear && isDeleteSome) { // Сноски удаляются только принудительно.
 							const refs = inventory.filter(e => e.t == 3);
 							const guids = refs.map(ref => ref.l);
 							const pointsData = await getMultiplePointsData(guids, undefined, forceClearButton);
@@ -1894,7 +1893,6 @@ if (!(isDeleteAll || isDeleteNone)) {
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
-
 													// API периодически меняется - то появляются данные о дате создания линии/региона, то исчезают. Пусть пишется на случай, если снова вернут.
 													const now = Date.now();
 													const linesCreationDates = parsedResponse.l.map(line => now - new Date(line.created_at));
@@ -2319,7 +2317,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 						total: selfData.x,
 						current: selfData.x - LEVEL_TARGETS.slice(0, selfData.l - 1).reduce((sum, e) => e + sum, 0),
 						goal: LEVEL_TARGETS[selfData.l - 1],
-						get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
+						get percentage() { return (this.goal == Infinity) ? 100 : Math.min(this.current / this.goal * 100, 100); }, // На случай повторного добавления уровней больше 10-го.
 						set string(str) { [this.current, this.goal = Infinity] = str.replace(/\s|,/g, '').split('/'); }
 					},
 					auth: localStorage.getItem('auth'),
@@ -2368,9 +2366,9 @@ if (!(isDeleteAll || isDeleteNone)) {
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
-				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
-				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
+				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
+				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2617,7 +2615,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 				});
 
 				window.addEventListener('refAquired', () => {
-					//refsAmount.classList.add('sbgcui_heartBeat');
+					refsAmount.classList.add('sbgcui_heartBeat');
 				});
 
 				refsAmount.addEventListener('animationend', () => {
@@ -2764,15 +2762,15 @@ if (!(isDeleteAll || isDeleteNone)) {
 				});
 
 				window.attack_slider.options = {
-					//speed: 200,
+					speed: 200,
 				};
 				window.deploy_slider.options = {
-					//speed: 200,
+					speed: 200,
 				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
-					//speed: 200,
+					speed: 200,
 					//perPage: 2,
 				};
 
@@ -3534,7 +3532,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 					});
 				}
 
-				let compareStatsWrp = document.createElement('div');
+				/*let compareStatsWrp = document.createElement('div');
 				let recordButton = document.createElement('button');
 				let compareButton = document.createElement('button');
 				let timestampSpan = document.createElement('span');
@@ -3552,7 +3550,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 
 				recordButton.addEventListener('click', recordStats);
 				compareButton.addEventListener('click', compareStats);
-				profilePopup.addEventListener('profilePopupOpened', updateTimestamp);
+				profilePopup.addEventListener('profilePopupOpened', updateTimestamp);*/
 			}
 
 
@@ -4312,7 +4310,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						//highlightFeature(chosenFeature, undefined, { once: true });
+						highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
@@ -4339,7 +4337,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							//highlightFeature(feature, undefined, { once: true });
+							highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4628,7 +4626,7 @@ if (!(isDeleteAll || isDeleteNone)) {
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					//highlightFeature(nextPoint, undefined, { once: true });
+					highlightFeature(nextPoint, undefined, { once: true });
 				}
 
 				function toggleArrowVisibility() {
@@ -5986,7 +5984,6 @@ if (!(isDeleteAll || isDeleteNone)) {
 
 				leaderboardPopup.appendChild(searchButton);
 			}
-			window.cuiStatus = 'loaded';
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
 		}
