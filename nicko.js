@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         SBG CUI fix
+// @name         SBG CUI M
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.82.fix
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
+// @version      1.14.89
+// @downloadURL  https://matros.by/sbg/nicko_new.js
+// @updateURL    https://matros.by/sbg/nicko_new.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://sbg-game.ru/app/*
@@ -20,6 +20,7 @@
 	const vanillaScriptSrc = document.querySelector('[src^="script"]').getAttribute('src');
 
     debugger
+window.cuiStatus = 'loading';
 	window.stop();
 	document.open();
 	if (/firefox/i.test(window.navigator.userAgent) == false) {
@@ -46,12 +47,13 @@
 
 	const USERSCRIPT_VERSION = '1.14.82';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
+	const HOME_DIR_2 = 'https://raw.githubusercontent.com/matrosby/sbg/master';
+	const VIEW_PADDING = (window.innerHeight / 2) * 0;
 	const {
 		ACTIONS_REWARDS, CORES_ENERGY, CORES_LIMITS, LINES_LIMIT, DISCOVERY_COOLDOWN, HIGHLEVEL_MARKER, HIT_TOLERANCE, INVENTORY_LIMIT,
 		INVIEW_MARKERS_MAX_ZOOM, INVIEW_POINTS_DATA_TTL, INVIEW_POINTS_LIMIT, ITEMS_TYPES, LATEST_KNOWN_VERSION, LEVEL_TARGETS,
 		MAX_DISPLAYED_CLUSTER, MIN_FREE_SPACE, PLAYER_RANGE, TILE_CACHE_SIZE, POSSIBLE_LINES_DISTANCE_LIMIT, BLAST_ANIMATION_DURATION
-	} = await fetch(`${HOME_DIR}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR}/const.json.\n\n${error.message}`); });
+	} = await fetch(`${HOME_DIR_2}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR_2}/const.json.\n\n${error.message}`); });
 
 
 	const config = {}, state = {}, favorites = {};
@@ -2366,9 +2368,9 @@
 
 				[styles, fa, faSvg].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-				styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
-				fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa.min.css`);
-				faSvg.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fa-svg.min.css`);
+				styles.setAttribute('href', "https://matros.by/sbg/css/styles.css");
+				fa.setAttribute('href', "https://matros.by/sbg/css/fa.css");
+				faSvg.setAttribute('href', "https://matros.by/sbg/css/fa-svg.css");
 
 				document.head.append(cssVars, fa, faSvg, styles);
 			}
@@ -2615,7 +2617,7 @@
 				});
 
 				window.addEventListener('refAquired', () => {
-					refsAmount.classList.add('sbgcui_heartBeat');
+					//refsAmount.classList.add('sbgcui_heartBeat');
 				});
 
 				refsAmount.addEventListener('animationend', () => {
@@ -2762,15 +2764,15 @@
 				});
 
 				window.attack_slider.options = {
-					speed: 200,
+					//speed: 200,
 				};
 				window.deploy_slider.options = {
-					speed: 200,
+					//speed: 200,
 				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
-					speed: 200,
+					//speed: 200,
 					//perPage: 2,
 				};
 
@@ -4310,7 +4312,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						highlightFeature(chosenFeature, undefined, { once: true });
+						//highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
@@ -4337,7 +4339,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							highlightFeature(feature, undefined, { once: true });
+							//highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4626,7 +4628,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					highlightFeature(nextPoint, undefined, { once: true });
+					//highlightFeature(nextPoint, undefined, { once: true });
 				}
 
 				function toggleArrowVisibility() {
@@ -5984,6 +5986,7 @@
 
 				leaderboardPopup.appendChild(searchButton);
 			}
+			window.cuiStatus = 'loaded';
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
 		}
