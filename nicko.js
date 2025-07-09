@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI M
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.89
+// @version      1.14.92
 // @downloadURL  https://matros.by/sbg/nicko_new.js
 // @updateURL    https://matros.by/sbg/nicko_new.js
 // @description  SBG Custom UI
@@ -186,15 +186,15 @@ window.cuiStatus = 'loading';
 			},
 			autoSelect: {
 				deploy: 'max',  // min || max || off
-				upgrade: 'min', // min || max || off
+				upgrade: 'max', // min || max || off
 				attack: 'latest',  // max || latest
 			},
 			mapFilters: {
-				invert: isDarkMode && !isCdbMap ? 1 : 0,
+				invert: isDarkMode && !isCdbMap ? 1 : 1,
 				hueRotate: isDarkMode ? 180 : 0,
 				brightness: isDarkMode ? 0.75 : 1,
 				grayscale: isDarkMode ? 1 : 0,
-				sepia: 1,
+				sepia: 0,
 				blur: 0,
 				branding: 'default', // default || custom
 				brandingColor: '#CCCCCC',
@@ -210,18 +210,18 @@ window.cuiStatus = 'loading';
 			},
 			ui: {
 				doubleClickZoom: 0,
-				restoreRotation: 1,
-				pointBgImage: 1,
+				restoreRotation: 0,
+				pointBgImage: 0,
 				pointBtnsRtl: 0,
 				pointBgImageBlur: 1,
 				pointDischargeTimeout: 1,
-				speedometer: 1,
+				speedometer: 0,
 			},
 			pointHighlighting: {
-				inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
-				outer: 'off',
-				outerTop: 'cores',
-				outerBottom: 'highlevel',
+				inner: 'off', // fav || ref || uniqc || uniqv || cores || highlevel || off
+				outer: 'ref',
+				outerTop: 'off',
+				outerBottom: 'off',
 				text: 'refsAmount', // energy || level || lines || refsAmount || off
 				innerColor: '#E87100',
 				outerColor: '#E87100',
@@ -2218,7 +2218,7 @@ window.cuiStatus = 'loading';
 					toastify.defaults.oldestFirst = options.oldestFirst ?? true;
 
 					options.style = {
-						fontSize: '0.8em',
+						fontSize: '0.9em',
 					};
 
 					return toastify(options);
@@ -3792,7 +3792,7 @@ window.cuiStatus = 'loading';
 					favsListContent.classList.add('sbgcui_favs-content');
 
 					favsListHeaderTitle.innerText = 'Избранные точки';
-					favsListHeaderSubtitle.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
+					favsListHeaderSubtitle.innerText = '';
 
 					favsListHeader.append(favsListHeaderTitle, favsListHeaderSubtitle);
 					favsList.append(favsListHeader, favsListContent);
@@ -4080,7 +4080,7 @@ window.cuiStatus = 'loading';
 						switch (type) {
 							case 'energy':
 								let energy = inview[this.id_]?.energy;
-								return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
+								return energy > 0 ? String(Math.round(energy)) : null;
 							case 'level':
 								let level = inview[this.id_]?.level;
 								return typeof level == 'number' ? String(level) : null;
@@ -4108,7 +4108,7 @@ window.cuiStatus = 'loading';
 						} else {
 							style[index] = new ol.style.Style({});
 							style[index].text_ = text ? new ol.style.Text({
-								font: '14px Manrope',
+								font: '13px Manrope',
 								offsetY: style[1].renderer_ ? -20 : 0,
 								text,
 								fill: new ol.style.Fill({ color: '#000' }),
@@ -5949,7 +5949,7 @@ window.cuiStatus = 'loading';
 			{
 				const input = document.querySelector('.inventory__manage-amount input');
 				const manageAmountButtons = document.querySelector('.inventory .inventory__ma-buttons');
-				const shortcuts = [10, 50, 100];
+				const shortcuts = [10, 20, 50];
 				const wrapper = document.createElement('div');
 
 				shortcuts.forEach(amount => {
