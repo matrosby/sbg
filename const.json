@@ -1,7 +1,7 @@
 {
   "LATEST_KNOWN_VERSION": "0.5.3",
   "DISCOVERY_COOLDOWN": 45,
-  "ACTIONS_REWARDS": { "destroy": { "core": 17, "line": 78, "region": 218  } },
+  "ACTIONS_REWARDS": { "destroy": { "core": 34, "line": 156, "region": 436  } },
   "CORES_LIMITS": [0, 6, 6, 4, 4, 3, 3, 2, 2, 2, 2],
   "LINES_LIMIT": { "out": 50 },
   "INVENTORY_LIMIT": 3250,
