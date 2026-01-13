@@ -1,26 +1,8 @@
-window.onTelegramAuth = async (data) => {
-  const request = await fetch('/api/link', {
-    method: 'post',
-    body: JSON.stringify(data),
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${localStorage.getItem('auth')}`
-    }
-  })
-  const response = await request.json()
-  if (request.status !== 200) {
-    $('#telegram-login-sbg_game_bot').after($('<div>', { text: i18next.t('telegram.failed'), class: 'tg-error' }).css('color', 'var(--accent)'))
-    console.error('Error while linking TG:', response)
-  }
-  if (response.al) console.warn('Note: Telegram account is already linked')
-  $('#telegram-login-sbg_game_bot').after($('<span>', { text: i18next.t('telegram.done') }).css('color', 'var(--progress)'))
-  $('#telegram-login-sbg_game_bot, .telegram-auth-button, .tg-error').remove()
-}
-
 ;(async function main() {
   const is_mobile = isMobile()
   if (!is_mobile) return
 
+  const SBG_FLAVOR = 'Stock/0.6.0'
   const Packages = [
     'jQuery', 'OpenLayers',
     'i18next', 'Splide.js',
@@ -127,7 +109,7 @@ window.onTelegramAuth = async (data) => {
     landlord: { stat: 'captures', req: [100, 1000, 2500, 7500, 15000, 30000] },
     fan: { stat: 'total_days', req: [7, 14, 30, 90, 180, 360] },
     caretaker: { stat: 'guard_point', req: [5, 14, 30, 90, 150, 300] },
-    janitor: { stat: 'brooms_used', req: [1, 25, 100, 400, 1000, 2750] },
+    janitor: { stat: 'brooms_used', req: [1, 5, 15, 75, 125, 250] },
   }
 
   const G2T = [[], [1], [2, 4, 5], [3], [6, 7]]
@@ -136,7 +118,11 @@ window.onTelegramAuth = async (data) => {
   const INVENTORY_LIMIT = 3000
   const COOLDOWN = 90
   const BURNOUT = 3600
-  const SERIES = 5
+  const REF_LIMIT = 100
+
+  class Bitfield{static MAX_BITS=32;#a=0;#b;size;constructor(r=0,s=Bitfield.MAX_BITS){this.size=s,this.#b=2**s-1,this.#a=r&this.#b};get(t){return!!(this.#a&1<<t)};set(t){return this.#a|=1<<t,this};setAll(){return this.#a=this.#b,this};setWith(t){return this.#a=t&this.#b,this};clr(t){return this.#a&=-1^1<<t,this};clrAll(){return this.#a=0,this};flip(t){return this.get(t)?this.clr(t):this.set(t),this};put(t,u){return!u?this.clr(t):this.set(t),this};isEmpty(){return 0===this.#a};isFull(){return this.#a===this.#b};forEach(t){for(let r=0;r<this.size;r++)t(this.get(r),r)};map(t){let r=[];return this.forEach((s,i)=>r.push(t(s,i))),r};toString(t=10){return this.#a.toString(t)};toNumber(){return this.#a};toArray(){return this.map(t=>t)};toSetArray(){let t=[];return this.forEach((r,s)=>r?t.push(s):void 0),t};[Symbol.iterator](){let t=0;return function*(r){for(;t<r.size;)yield r.get(t),t++}(this)}}
+  function flavored_fetch(input,init={}){if(!('headers'in init))init['headers']={};init['headers']['x-sbg-flavor']=SBG_FLAVOR;return fetch(input,init)}
+  class PlayerMoveEvent extends Event{#pos;constructor(pos){super('playermove');this.#pos=pos}get new_position(){return this.#pos}}
 
   jqueryI18next.init(i18next, $, { useOptionsAttr: true })
   $('html').attr('lang', LANG)
@@ -149,7 +135,7 @@ window.onTelegramAuth = async (data) => {
     const { request, response } = await apiQuery('self').catch(({ toast }) => apiCatch(toast))
     if (!response) return
     Object.assign(self_data, response)
-    VERSION = request.headers.get('SBG-Version')
+    VERSION = request.headers.get('x-sbg-version')
   }
 
   updateSelfInfo()
@@ -219,9 +205,9 @@ window.onTelegramAuth = async (data) => {
   const regions_layer = new ol.layer.Vector({ source: regions_source, name: 'regions', className: 'ol-layer__regions', zIndex: 1 })
 
   const FeatureStyles = {
-    POINT: (pos, team, energy, light) => new ol.style.Style({
+    POINT: (pos, team, energy) => new ol.style.Style({
       geometry: new ol.geom.Circle(pos, 12),
-      renderer: (coords, state) => {
+      renderer(coords, state) {
         const ctx = state.context
         const [[xc, yc], [xe, ye]] = coords
         const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2)
@@ -249,23 +235,8 @@ window.onTelegramAuth = async (data) => {
         ctx.beginPath()
         ctx.arc(xc, yc, radius, 0, 2 * Math.PI)
         ctx.stroke()
-
-        const h = JSON.parse(localStorage.getItem('map-config')).h
-        if (h == 0) return
-        const offset = is_mobile ? 12 : 4
-        ctx.lineWidth = is_mobile ? 6 : 3
-        if (typeof light === 'boolean' && light) {
-          ctx.strokeStyle = LightStrokes[h]
-          ctx.beginPath()
-          ctx.arc(xc, yc, radius + offset, 0, 2 * Math.PI)
-          ctx.stroke()
-        } else if (typeof light === 'number') {
-          ctx.beginPath()
-          ctx.strokeStyle = LevelColors[light - 1]
-          ctx.arc(xc, yc, radius + offset, 0, 2 * Math.PI)
-          ctx.stroke()
-        }
-      }
+      },
+      zIndex: 2
     }),
     TEXT: (text) => new ol.style.Style({
       text: new ol.style.Text({
@@ -275,8 +246,75 @@ window.onTelegramAuth = async (data) => {
         fill: new ol.style.Fill({ color: '#000' }),
         stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
       }),
-      zIndex: 2
-    })
+      zIndex: 3
+    }),
+    LIGHT: (pos, id, value) => new ol.style.Style({
+      geometry: new ol.geom.Circle(pos, 12),
+      renderer(coords, state) {
+        if (id === 0) return
+
+        const ctx = state.context
+        const [[xc, yc], [xe, ye]] = coords
+        const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2)
+
+        const offset = is_mobile ? 12 : 4
+        ctx.lineWidth = is_mobile ? 6 : 3
+        switch (id) {
+          case 1: case 2:
+          case 3: case 4:
+            if (!value) return
+            ctx.strokeStyle = LightStrokes[id]
+            ctx.beginPath()
+            ctx.arc(xc, yc, radius + offset, 0, 2 * Math.PI)
+            ctx.stroke()
+            break
+          case 5:
+            ctx.beginPath()
+            ctx.strokeStyle = LevelColors[value - 1]
+            ctx.arc(xc, yc, radius + offset, 0, 2 * Math.PI)
+            ctx.stroke()
+            break
+          case 6:
+            if (!value) return
+            const pellets = 6
+            const half = 1.75 * Math.PI / (pellets * 2)
+
+            ctx.fillStyle = is_dark ? '#c380ff' : '#80f'
+            ctx.beginPath()
+            let angle = -Math.PI / 2
+            for (let pellet = 0; pellet < pellets; pellet++) {
+              if (pellet === value) {
+                ctx.fill()
+                ctx.fillStyle = is_dark ? '#c380ff33' : '#80f3'
+                ctx.beginPath()
+              }
+              ctx.arc(xc, yc, radius + offset, angle - half, angle + half)
+              ctx.arc(xc, yc, radius + offset + ctx.lineWidth, angle + half, angle - half, true)
+              ctx.moveTo(xc, yc)
+              angle += 2 * Math.PI / pellets
+            }
+            ctx.fill()
+            break
+          case 7:
+            if (!value) return
+            if (value < 10) ctx.strokeStyle = 'hsl(36 100% 50%)'
+            else ctx.strokeStyle = 'hsl(36 100% 75%)'
+            ctx.beginPath()
+            ctx.arc(xc, yc, radius + offset, 0, 2 * Math.PI)
+            ctx.stroke()
+            break
+          default:
+            return
+        }
+      }
+    }),
+  }
+  const RHN = []
+  const RHA = []
+  const RHS = 180 / 8
+  for (let rhumb = 0; rhumb < 8; rhumb++) {
+    RHN.push(i18next.t(`info.bearing.rhumbs.${n}`))
+    RHA.push(RHS * (n + .5))
   }
 
   // EPSG:4326 - common
@@ -310,7 +348,9 @@ window.onTelegramAuth = async (data) => {
 
   const request_controllers = {
     entities: new AbortController(),
-    points: new AbortController()
+    points: new AbortController(),
+    draw: new AbortController(),
+    profile: new AbortController(),
   }
 
   ;(async function handleURLLinks() {
@@ -321,7 +361,7 @@ window.onTelegramAuth = async (data) => {
       if (!guid.match(/^[a-z\d]{12}\.22a$/)) return
       map.setProperties({ ignore_follow: true })
       const { response } = await apiQuery('point', { guid }).catch(({ toast }) => apiCatch(toast))
-      $('#toggle-follow').attr('data-active', false)
+      document.querySelector('#toggle-follow').checked = false
       localStorage.setItem('follow', false)
       view.setCenter(ol.proj.fromLonLat(response.data.c))
       showInfo(response.data)
@@ -386,10 +426,10 @@ window.onTelegramAuth = async (data) => {
   if ('geolocation' in navigator) {
     watcher = navigator.geolocation.watchPosition(({ coords }) => {
       movePlayer([coords.longitude, coords.latitude])
-      $('#toggle-follow').attr('data-active', localStorage.getItem('follow') !== 'false')
+      document.querySelector('#toggle-follow').checked = localStorage.getItem('follow') !== 'false'
       if (!map.getProperties().is_first_watched) {
         map.setProperties({ is_first_watched: true })
-        $('#toggle-follow').prop('disabled', false)
+        $('#toggle-follow-btn').prop('disabled', false)
       }
     }, error => {
       console.error('Geolocation API got an error:', error)
@@ -407,7 +447,7 @@ window.onTelegramAuth = async (data) => {
         } else {
           player_source.clear()
           $('#self-info__coord').parent().remove()
-          $('#toggle-follow').remove()
+          $('#toggle-follow-btn').remove()
         }
       } else {
         const toast = createToast(i18next.t('popups.gps.generic', { code: error.code }))
@@ -431,7 +471,8 @@ window.onTelegramAuth = async (data) => {
     score: null,
     damage_texts: [],
     long_tap: null,
-    levelup: null
+    levelup: null,
+    refs_data: null,
   }
   const point_state = {
     info: {},
@@ -441,7 +482,7 @@ window.onTelegramAuth = async (data) => {
 
   const slider_config = {
     drag: 'free', snap: true, perPage: 3, pagination: false, wheel: true,
-    direction: 'ltr', height: 100, gap: '.5em', focus: 'center', trimSpace: false
+    direction: 'ltr', height: 'auto', gap: '.5em', focus: 'center', trimSpace: false
   }
   const attack_slider = new Splide('#attack-slider', slider_config)
   attack_slider.on('click', event => {
@@ -458,22 +499,25 @@ window.onTelegramAuth = async (data) => {
     const highlevel = catalyser.l > self_data.l
     $('#attack-slider-fire').prop('disabled', highlevel)
     $('.attack-slider-highlevel').css('color', highlevel ? '#F00' : '#0000')
+    if (!highlevel && catalyser.t === 2) changeSettings('lastwp', catalyser.l)
   })
   attack_slider.mount()
 
   const deploy_slider = new Splide('#deploy-slider', slider_config)
   deploy_slider.on('click', event => {
     if (deploy_slider.index == event.index) return
+    document.querySelector('#magic-deploy').checked = false
     deploy_slider.go(event.index)
   })
   deploy_slider.on('move drag scroll', () => $('#deploy').prop('disabled', true))
   deploy_slider.on('moved dragged scrolled', () => {
     deploy_slider.emit('active', { slide: $(deploy_slider.root).find('.splide__slide.is-active') })
   })
+  deploy_slider.on('drag scroll', () => document.querySelector('#magic-deploy').checked = false)
   deploy_slider.on('active', manageDeploy)
   deploy_slider.mount()
 
-  slider_config.height = 150
+  slider_config.height = 100
   slider_config.perPage = 3
   slider_config.gap = '1em'
   const draw_slider = new Splide('#draw-slider', slider_config)
@@ -516,15 +560,27 @@ window.onTelegramAuth = async (data) => {
     localStorage.setItem('cooldowns', JSON.stringify(cooldowns))
     localStorage.setItem('refs-cache', JSON.stringify(refs_cache))
   }, 5 * 60e3)
+
+  document.querySelector('.info').addEventListener('playermove', function() {
+    if (this.classList.contains('hidden') || typeof point_state.info.c === 'undefined') return
+    manageControls()
+    manageDeploy()
+    document.querySelector('#i-stat__distance').textContent = distanceToString(getDistance(point_state.info.c))
+    document.querySelector('#i-stat__bearing').style.transform = `rotate(${Math.round(getBearing(point_state.info.c))}deg)`
+  })
+
   async function doDiscovery() {
-    $('#discover').addClass('locked').prop('disabled', true)
+    const parent = this.parentElement
+    parent.classList.add('locked')
+    Array.from(parent.children).forEach(e => e.setAttribute('disabled', ''))
     const guid = $('.info').attr('data-guid')
     const { response } = await apiSend('discover', 'post', {
       position: ol.proj.toLonLat(player_feature.getGeometry().getCoordinates()),
       guid,
       wish: +this.dataset['wish']
     }, [$('.info')[0], 'top right']).catch(({ toast }) => apiCatch(toast, true))
-    $('#discover').removeClass('locked').prop('disabled', false)
+    parent.classList.remove('locked')
+    Array.from(parent.children).forEach(e => e.removeAttribute('disabled'))
     if (!response) return
     const cache = JSON.parse(localStorage.getItem('inventory-cache'))
     response.loot.forEach(e => {
@@ -538,7 +594,7 @@ window.onTelegramAuth = async (data) => {
     $('#self-info__inv').text(total)
       .parent().css('color', total >= INVENTORY_LIMIT ? 'var(--accent)' : '')
     const ref = cache.find(f => f.t === 3 && f.l === $('.info').attr('data-guid'))
-    $('#i-ref').text(i18next.t('info.refs', { count: ref?.a || 0 })).attr('data-has', ref ? 1 : 0)
+    $('#i-ref').text(i18next.t('info.refs', { count: ref?.a || 0, max: REF_LIMIT })).attr('data-has', ref ? 1 : 0)
 
     handleExpChange(response.xp)
 
@@ -571,7 +627,10 @@ window.onTelegramAuth = async (data) => {
       const active = document.querySelector('#catalysers-list .is-active').getAttribute('data-guid')
       let new_index = 0
       $('#catalysers-list').empty()
-      cache.filter(f => G2T[2].includes(f.t)).sort((a, b) => a.t === b.t ? a.l - b.l : a.t - b.t).forEach((e, n) => {
+      const predicate = getSettings('atkord')
+        ? ((a, b) => a.t === b.t ? a.l - b.l : b.t - a.t)
+        : ((a, b) => a.t === b.t ? a.l - b.l : a.t - b.t)
+      cache.filter(f => G2T[2].includes(f.t)).sort(predicate).forEach((e, n) => {
         const el = $('<li>', { class: 'splide__slide', 'data-guid': e.g })
         el.attr(e.t > 3 ? 'data-rarity' : 'data-level', e.l)
         el.append($('<span>', { class: 'catalysers-list__level', text: makeShortItemTitle(e) }).css('color', e.t > 3 ? 'var(--text)' : `var(--level-${e.l})`))
@@ -596,15 +655,8 @@ window.onTelegramAuth = async (data) => {
     deploy_slider.refresh()
     deploy_slider.go(new_index)
   }
-  $('#discover').on('click touchswipe', doDiscovery)
-  document.querySelectorAll('.discover-mod').forEach(e => e.addEventListener('touchswipe', doDiscovery))
-  const dscv_popper = Popper.createPopper(document.querySelector('#discover'), document.querySelector('.i-buttons .pb-sub'), {
-    placement: 'top',
-    modifiers: [
-      { name: 'offset', options: { offset: [0, 10] } },
-      { name: 'flip', options: { fallbackPlacements: ['top-start', 'bottom', 'bottom-start'] } }
-    ]
-  })
+  $('#discover').on('click', doDiscovery)
+  document.querySelectorAll('.discover-mod').forEach(e => e.addEventListener('click', doDiscovery))
   $('#deploy').on('click', async () => {
     const state = $('#deploy').attr('data-state')
     $('#deploy').addClass('locked').prop('disabled', true)
@@ -639,8 +691,8 @@ window.onTelegramAuth = async (data) => {
         '--bgc': `var(--level-${response.c.l})`
       })
       const info = $(`.i-stat__core-info[data-guid="${response.c.g}"] span`)
-      info.eq(0).text(`${Math.floor(response.c.e / Cores[response.c.l].eng * 100)}%`).attr('title', `${response.c.e} / ${Cores[response.c.l].eng}`)
-      info.eq(1).text(`${response.c.o}`)
+      info.eq(0).text(Math.floor(response.c.e / Cores[response.c.l].eng * 100) + '%').attr('title', `${response.c.e} / ${Cores[response.c.l].eng}`)
+      info.eq(1).text(response.c.o)
       xp = response.xp
     }
 
@@ -664,6 +716,11 @@ window.onTelegramAuth = async (data) => {
     $('#self-info__inv').text(total)
       .parent().css('color', total >= INVENTORY_LIMIT ? 'var(--accent)' : '')
     handleExpChange(xp)
+  })
+  document.querySelector('#magic-deploy-btn').addEventListener('click', () => {
+    const input = document.querySelector('#magic-deploy')
+    input.checked = !input.checked
+    if (input.checked) adjustDeploymentSlider()
   })
   $('#repair').on('click', async () => {
     $('#repair').addClass('locked').prop('disabled', true)
@@ -696,11 +753,11 @@ window.onTelegramAuth = async (data) => {
       })
       eng += core.e; eng_total += Cores[core.l].eng
     })
+    manageControls()
 
     const feature = points_source.getFeatureById(guid)
     if (feature) {
-      const prop = feature.getProperties()
-      feature.getStyle()[0] = FeatureStyles.POINT(ol.proj.fromLonLat(point_state.info.c), point_state.info.te, eng / eng_total, prop.highlight)
+      feature.getStyle()[0] = FeatureStyles.POINT(ol.proj.fromLonLat(point_state.info.c), point_state.info.te, eng / eng_total)
       feature.changed()
     }
     point_state.info.co = response.data
@@ -708,21 +765,25 @@ window.onTelegramAuth = async (data) => {
   $('#draw').on('click', async () => {
     $('#draw').addClass('locked').prop('disabled', true)
     const guid = $('.info').attr('data-guid')
-    const { response } = await apiQuery('draw', {
-      guid,
-      position: ol.proj.toLonLat(player_feature.getGeometry().getCoordinates()),
-      exref: JSON.parse(localStorage.getItem('settings'))?.exref
-    }, [$('.info')[0], 'top right']).catch(({ toast }) => apiCatch(toast, true))
+    if (!point_state.possible_lines.length) {
+      request_controllers.draw.abort('0x00')
+      request_controllers.draw = new AbortController()
+      const { response } = await apiQuery('draw', {
+        guid,
+        position: ol.proj.toLonLat(player_feature.getGeometry().getCoordinates()),
+        exref: JSON.parse(localStorage.getItem('settings'))?.exref
+      }, [$('.info')[0], 'top right']).catch(({ toast }) => apiCatch(toast, true))
+      if (!response) return
+      point_state.possible_lines = response.data
+    }
     $('#draw').removeClass('locked').prop('disabled', false)
     view.setProperties({ offset: [0, ViewOffsets.CENTER] })
-    if (!response) return
-    if (!response.data.length) {
+    if (!point_state.possible_lines.length) {
       const toast = createToast(i18next.t('popups.lines-none'), $('.info')[0], 'top right')
       handlePopupToasts(toast)
       return
     }
     temp_lines_source.clear()
-    point_state.possible_lines = response.data
     closePopup(document.querySelector('.info'))
     $('.topleft-container, .bottomleft-container, .ol-attribution').addClass('hidden')
     $('.draw-slider-wrp').removeClass('hidden').attr({
@@ -730,8 +791,10 @@ window.onTelegramAuth = async (data) => {
       'data-follow': localStorage.getItem('follow') ?? true
     })
     localStorage.setItem('follow', false)
+    document.querySelector('#attack-menu').setAttribute('disabled', '')
+    document.querySelector('.attack-slider-wrp').classList.add('hidden')
     $('#refs-list').empty()
-    response.data.forEach(e => {
+    point_state.possible_lines.forEach(e => {
       $('#refs-list').append($('<li>', { class: 'splide__slide', 'data-ref': e.r, 'data-point': e.p })
         .append($('<div>', { class: 'refs-list__title', text: e.t }))
         .append($('<div>', { class: 'refs-list__image' }).append($('<div>').css('background-image', `url(${getPointImage(e.i)})`)))
@@ -758,7 +821,16 @@ window.onTelegramAuth = async (data) => {
     $('#self-info__inv').text(total)
       .parent().css('color', total >= INVENTORY_LIMIT ? 'var(--accent)' : '')
     drawInventory()
-    getRefsData($('.inventory__content')[0])
+
+    const content = document.querySelector('.inventory__content')
+    if (content.getAttribute('data-tab') == 3) {
+      const order = JSON.parse(localStorage.getItem('refs-arrangement'))
+      const top = JSON.parse(localStorage.getItem('refs-view')).scroll ?? 0
+
+      if (order !== null) arrangeInventoryRefs(order)
+      content.scrollTo({ top })
+      if (order === null) getRefsData(content)
+    }
   })
   $('#inventory__close').on('click', () => {
     $('.inventory').addClass('hidden')
@@ -775,7 +847,16 @@ window.onTelegramAuth = async (data) => {
     $('.inventory__tab').removeClass('active')
     tab.addClass('active')
     drawInventory()
-    getRefsData($('.inventory__content')[0])
+
+    const content = document.querySelector('.inventory__content')
+    if (content.getAttribute('data-tab') == 3) {
+      const order = JSON.parse(localStorage.getItem('refs-arrangement'))
+      const top = JSON.parse(localStorage.getItem('refs-view')).scroll ?? 0
+
+      if (order !== null) arrangeInventoryRefs(order)
+      content.scrollTo({ top })
+      if (order === null) getRefsData(content)
+    }
   })
   $('.inventory__content').on('scroll', e => getRefsData(e.target))
 
@@ -838,6 +919,9 @@ window.onTelegramAuth = async (data) => {
       })
     }
   })
+  document.querySelector('#inventory-sort').addEventListener('click', () => {
+    document.querySelector('.inventory__sorter').classList.toggle('hidden')
+  })
   $('.inventory__ma-counter button').on('click', e => {
     const input = $('.inventory__ma-amount')
     const max = input.attr('max')
@@ -861,6 +945,54 @@ window.onTelegramAuth = async (data) => {
   $('.inventory__ma-delete').on('click', e => {
     deleteInventoryItem($(e.target).parents().eq(1))
   })
+  ;(function initSorterInputs() {
+    const wrp = document.querySelector('.inventory__sorter')
+    const view = JSON.parse(localStorage.getItem('refs-view'))
+    if (view !== null) {
+      const teams = new Bitfield(view.t)
+      wrp.querySelector(`[name="q"][value="${view.q}"]`).checked = true
+      wrp.querySelector(`[name="o"][value="${view.o}"]`).checked = true
+      wrp.querySelectorAll('[name="t"]').forEach(e => e.checked = teams.get(+e.value))
+    }
+  })();
+  document.querySelector('.inventory__sorter').addEventListener('submit', async function(event) {
+    event.preventDefault()
+
+    const view = JSON.parse(localStorage.getItem('refs-view'))
+    const query = +this.querySelector('[name="q"]:checked').value
+    const order = +this.querySelector('[name="o"]:checked').value
+
+    view.q = query
+    view.o = order
+    if (query === 3) {
+      const pos = ol.proj.toLonLat(player_feature.getGeometry().getCoordinates())
+      view.p = pos
+    }
+    if (query !== 4) {
+      const teams = new Bitfield(0, 4)
+      this.querySelectorAll('[name="t"]:checked').forEach(el => teams.set(el.value))
+      view.t = teams.toNumber()
+    }
+
+    const params = Object.assign({}, view)
+    delete params.scroll
+    const btn = this.querySelector('[type="submit"]')
+    btn.setAttribute('disabled', '')
+
+    const { response } = await apiQuery('refs', params, [this]).catch(({ toast }) => apiCatch(toast, true))
+    btn.removeAttribute('disabled')
+
+    arrangeInventoryRefs(response)
+    this.classList.add('hidden')
+    localStorage.setItem('refs-view', JSON.stringify(view))
+    localStorage.setItem('refs-arrangement', JSON.stringify(response))
+  })
+  document.querySelectorAll('.inventory__sorter input[name="q"]').forEach(el => el.addEventListener('change', e => {
+    const disabled = e.currentTarget.value == 4
+    document.querySelectorAll('.inventory__sorter input[name="t"]').forEach(el => {
+      el[disabled ? 'setAttribute' : 'removeAttribute']('disabled', '')
+    })
+  }))
   document.querySelector('.inventory__ma-use').addEventListener('click', async function() {
     const parent = this.parentNode.parentNode
     const guid = parent.getAttribute('data-guid')
@@ -969,7 +1101,8 @@ window.onTelegramAuth = async (data) => {
       points: ['captures', 'neutralizes', 'cores_deployed',
       'cores_destroyed', 'owned'],
       drawing: ['lines', 'max_line', 'lines_destroyed', 'regions', 'max_region', 'regions_destroyed'],
-      exploration: ['discoveries', 'unique_visits', 'unique_captures', 'days']
+      exploration: ['discoveries', 'unique_visits', 'unique_captures', 'days'],
+      misc: ['brooms_used'],
     }
     const container = $('#leaderboard__term-select')
     for (const section in stats) {
@@ -991,7 +1124,10 @@ window.onTelegramAuth = async (data) => {
 
   $('#attack-menu').on('click', async () => {
     const inventory = JSON.parse(localStorage.getItem('inventory-cache'))
-    const weapons = inventory.filter(f => G2T[2].includes(f.t)).sort((a, b) => a.t === b.t ? a.l - b.l : a.t - b.t)
+    const predicate = getSettings('atkord')
+      ? ((a, b) => a.t === b.t ? a.l - b.l : b.t - a.t)
+      : ((a, b) => a.t === b.t ? a.l - b.l : a.t - b.t)
+    const weapons = inventory.filter(f => G2T[2].includes(f.t)).sort(predicate)
     if (!weapons.length) {
       const toast = createToast(i18next.t('popups.no-weapons'))
       toast.showToast()
@@ -1004,8 +1140,15 @@ window.onTelegramAuth = async (data) => {
       return
     }
 
-    const active = document.querySelector('#catalysers-list .is-active')?.getAttribute('data-guid')
+    const strat = getSettings('strtwp')
+    const lastwp = getSettings('lastwp') ?? null
+    let level_buf = strat === 'low' ? Infinity : -Infinity
     let new_index = 0
+    const checkout = (index, level) => {
+      new_index = index
+      level_buf = level
+    }
+
     $('#catalysers-list').empty()
     weapons.forEach((e, n) => {
       const el = $('<li>', { class: 'splide__slide', 'data-guid': e.g })
@@ -1013,7 +1156,21 @@ window.onTelegramAuth = async (data) => {
       el.append($('<span>', { class: 'catalysers-list__level', text: makeShortItemTitle(e) }).css('color', e.t > 3 ? 'var(--text)' : `var(--level-${e.l})`))
         .append($('<span>', { class: 'catalysers-list__amount', text: i18next.t('items.amount', { count: e.a }) }))
       $('#catalysers-list').append(el)
-      if (e.g === active) new_index = n
+      if (e.t === 2) {
+        switch (strat) {
+          default:
+          case 'high':
+            if (e.l <= self_data.l && e.l > level_buf) checkout(n, e.l)
+            break
+          case 'low':
+            if (e.l <= self_data.l && e.l < level_buf) checkout(n, e.l)
+            break
+          case 'latest':
+            if ((lastwp === null && e.l <= self_data.l && e.l > level_buf) || e.l === lastwp)
+              checkout(n, e.l)
+            break
+        }
+      }
     })
     attack_slider.refresh()
     attack_slider.go(new_index)
@@ -1027,13 +1184,8 @@ window.onTelegramAuth = async (data) => {
     const index = inventory.findIndex(f => f.g === guid)
     const item = inventory[index]
 
-    if (item.t === 5) {
-      const proof = confirm(String.prototype.concat(
-        'Вы собираетесь применить ластик, который нейтрализует все точки в радиусе километра.\n',
-        'Однако сила взрыва влияет на физические константы, из-за чего ваши точки в ближайшие 3 дня\x20',
-        'будут терять прочность быстрее, чем обычно. Кроме того, оповещение об этом будет отправлено на форум.\n',
-        'Продолжить?'
-      ))
+    if ([4, 5].includes(item.t)) {
+      const proof = confirm(i18next.t('popups.attack-confirmation.' + item.t))
       if (!proof) return
     }
 
@@ -1046,20 +1198,38 @@ window.onTelegramAuth = async (data) => {
     if (!response) return
 
     // вешаем стили на точки
+    const highlight = JSON.parse(localStorage.getItem('map-config'))?.h ?? 0
     response.c.forEach(e => {
       const feature = points_source.getFeatureById(e.guid)
       if (!feature) return
       const pos = feature.getGeometry().getCoordinates()
       const prop = feature.getProperties()
-      const diff = Math.round((e.energy - prop.energy) * 100)
-      feature.getStyle().push(FeatureStyles.TEXT(diff <= 0 ? `${diff}%` : i18next.t('items.types.core') + '!'))
+      const style = feature.getStyle()
+      const diff = +((e.energy - prop.energy) * 100).toFixed(2)
+      const cores_diff = e.cores - prop.cores
 
-      if (e.energy <= 0) feature.getStyle()[0] = FeatureStyles.POINT(pos, 0, 0, prop.highlight)
-      else feature.getStyle()[0] = FeatureStyles.POINT(pos, prop.team, e.energy, prop.highlight)
+      let notif
+      if (cores_diff < 0) { // ядра выбиты
+        notif = i18next.t('popups.attack-notifs.knocked')
+        if (cores_diff < -1)
+          notif = i18next.t('popups.attack-notifs.combo', { n: -cores_diff })
+      } else if (cores_diff > 0) { // ядра подставлены
+        notif = i18next.t('popups.attack-notifs.inserted')
+      } else if (diff <= 0) { // нанесен урон
+        notif = i18next.t('popups.attack-notifs.damage', { n: Math.round(diff) })
+      } else if (diff > 0) { // ведется чардж
+        notif = i18next.t('popups.attack-notifs.repaired')
+      }
+      if (typeof notif !== 'undefined')
+        style.push(FeatureStyles.TEXT(notif))
+
+      if (e.energy <= 0) style[0] = FeatureStyles.POINT(pos, 0, 0)
+      else style[0] = FeatureStyles.POINT(pos, e.team, e.energy)
+      style[1] = FeatureStyles.LIGHT(pos, highlight, prop.highlight)
       feature.setProperties({
-        team: e.energy <= 0 ? 0 : prop.team,
+        team: e.energy <= 0 ? 0 : e.team,
+        cores: e.cores,
         energy: e.energy,
-        highlight: e.highlight
       })
       feature.changed()
     })
@@ -1086,7 +1256,7 @@ window.onTelegramAuth = async (data) => {
           font.setStroke(new ol.style.Stroke({ color: `rgba(255, 255, 255, ${opacity})`, width: 3 }))
           if (opacity <= 0) {
             clearInterval(timer)
-            feature.getStyle().splice(1, 1)
+            feature.getStyle().splice(2, 1)
           }
           feature.changed()
         }, 50)
@@ -1204,12 +1374,20 @@ window.onTelegramAuth = async (data) => {
     movePlayer(ol.proj.toLonLat(player_feature.getGeometry().getCoordinates()))
   })
   $('#draw-slider-close').on('click', closeDrawSlider)
+  document.querySelectorAll('.slider-button__nav').forEach(e => e.addEventListener('click', function() {
+    const wrp = this.parentElement.parentElement.parentElement.querySelector('.splide')
+    const slider = { attack_slider, draw_slider }[wrp.id.replace(/-/g, '_')]
+    switch (this.getAttribute('data-dir')) {
+      case 'F': slider.go(0); break
+      case 'L': slider.go(wrp.querySelector('.splide__list').children.length - 1); break
+    }
+  }))
 
-  $('#toggle-follow').attr('data-active', localStorage.getItem('follow') != 'false')
-  $('#toggle-follow').on('click', e => {
+  document.querySelector('#toggle-follow').checked = localStorage.getItem('follow') != 'false'
+  $('#toggle-follow-btn').on('click', e => {
     const active = localStorage.getItem('follow') != 'false'
     localStorage.setItem('follow', !active)
-    $(e.target).attr('data-active', !active)
+    document.querySelector('#toggle-follow').checked = !active
     if (!active) {
       movePlayer(ol.proj.toLonLat(player_feature.getGeometry().getCoordinates()))
       if (view.getZoom() < 15) view.setZoom(17)
@@ -1220,7 +1398,7 @@ window.onTelegramAuth = async (data) => {
     if (!$('.layers-config').hasClass('hidden')) return $('.layers-config').addClass('hidden')
     $('.layers-config').removeClass('hidden')
     const data = JSON.parse(localStorage.getItem('map-config'))
-    const layers = Bitfield.from(data.l)
+    const layers = new Bitfield(data.l)
     layers.forEach((e, n) => $(`[name="layer"][value="${n}"]`).prop('checked', e))
     $(`#map-lights [value="${data.h}"]`).prop('selected', true)
     updateSettings()
@@ -1234,7 +1412,7 @@ window.onTelegramAuth = async (data) => {
     const button = $(e.target)
     const data = JSON.parse(localStorage.getItem('map-config'))
     const layers = new Bitfield()
-    $('[name="layer"]').each((_, e) => layers.change($(e).val(), $(e).prop('checked')))
+    $('[name="layer"]').each((_, e) => layers.put($(e).val(), $(e).prop('checked')))
     data.l = +layers.toString()
     data.h = +$('#map-lights').val()
     localStorage.setItem('map-config', JSON.stringify(data))
@@ -1322,10 +1500,19 @@ window.onTelegramAuth = async (data) => {
     document.querySelector('.effects').setAttribute('data-mode', value)
     changeSettings('efmode', value)
   })
+  document.querySelector('[data-setting="atkord"]').addEventListener('change', function() {
+    const value = this.checked
+    changeSettings('atkord', value)
+  })
   $('.regions-opacity__range input').on('input', e => {
     const val = +$(e.target).val()
     $('#regions-opacity__cur').text(Math.round(val / 15 * 100) + '%')
     changeSettings('opacity', val)
+  })
+  document.querySelectorAll('[data-setting^="strt"]').forEach(e => {
+    e.addEventListener('change', function() {
+      changeSettings(this.getAttribute('data-setting'), this.value)
+    })
   })
   $('#settings-credits').on('click', async e => {
     if ($('.credits').length) return $('.credits').removeClass('hidden')
@@ -1333,7 +1520,6 @@ window.onTelegramAuth = async (data) => {
     const request = await fetch('/fragments/credits.html', {
       method: 'get',
       headers: {
-        authorization: `Bearer ${localStorage.getItem('auth')}`,
         'accept-language': LANG
       }
     })
@@ -1385,7 +1571,7 @@ window.onTelegramAuth = async (data) => {
           $('<button>', { class: 'notifs__entry-view icon-button' })
           .append($('<svg viewBox="0 0 597 512" height="1em"><use href="#fas-eye"></use></svg>'))
           .on('click', () => {
-            $('#toggle-follow').attr('data-active', false)
+            document.querySelector('#toggle-follow').checked = false
             localStorage.setItem('follow', false)
             view.setCenter(ol.proj.fromLonLat(entry.c))
             $('.notifs').addClass('hidden')
@@ -1401,39 +1587,21 @@ window.onTelegramAuth = async (data) => {
     count_regions = !count_regions
   })
 
-  const LONG_TOUCH_SWIPE = new Event('touchswipe')
-  const LONG_TOUCH_EVENT = new Event('touchlong')
-  const LONG_TOUCH_DELAY = 500
-  document.querySelectorAll('.popping-button').forEach(wrp => {
-    const pb_main = wrp.querySelector('.pb-main')
-    const pb_sub = wrp.querySelector('.pb-sub')
-    pb_main.addEventListener('touchstart', function() {
-      clearTimeout(timers.long_tap)
-      if (this.getAttribute('disabled') !== null) return
-      timers.long_tap = setTimeout(() => wrp.dispatchEvent(LONG_TOUCH_EVENT), LONG_TOUCH_DELAY)
-    })
-    wrp.addEventListener('touchlong', function() {
-      pb_sub.classList.remove('hidden')
-      dscv_popper.update()
-    })
-    wrp.addEventListener('touchend', function(event) {
-      clearTimeout(timers.long_tap)
-      if (pb_sub.classList.contains('hidden')) return
-
-      const touch = event.changedTouches.item(0)
-      const target = document.elementFromPoint(touch.clientX, touch.clientY)
-      console.log(touch, target)
-      // todo проверить, что это наш элемент
-      target.dispatchEvent(LONG_TOUCH_SWIPE)
-      pb_sub.classList.add('hidden')
-    })
-  })
-
   $('#logout').on('click', async () => {
     const proof = confirm(i18next.t('popups.logout'))
     if (!proof) return
     clearStorage()
     location.href = '/login'
+  })
+  document.querySelector('#change-pass').addEventListener('click', async function() {
+    const value = prompt(i18next.t('popups.change-pass'))
+    if (!value) return
+    this.setAttribute('disabled', '')
+    const { response } = await apiSend('account', 'post', { param: 'pass', value })
+      .catch(({ error }) => alert(error))
+      .finally(() => this.removeAttribute('disabled'))
+    if (!response) return
+    alert(i18next.t('popups.change-pass-done'))
   })
   ;(function initCompass() {
     if (!('AbsoluteOrientationSensor' in window)) return console.warn('AOSensor is not supported')
@@ -1467,6 +1635,18 @@ window.onTelegramAuth = async (data) => {
       toast.showToast()
     })
   })();
+
+  window.onTelegramAuth = async (data) => {
+    const { request, response } = await apiSend('/api/link', 'post', JSON.stringify(data))
+    if (request.status !== 200) {
+      $('#telegram-login-sbg_game_bot').after($('<div>', { text: i18next.t('telegram.failed'), class: 'tg-error' }).css('color', 'var(--accent)'))
+      console.error('Error while linking TG:', response)
+    }
+    if (response.al) console.warn('Note: Telegram account is already linked')
+    $('#telegram-login-sbg_game_bot').after($('<span>', { text: i18next.t('telegram.done') }).css('color', 'var(--progress)'))
+    $('#telegram-login-sbg_game_bot, .telegram-auth-button, .tg-error').remove()
+  }
+
   // DEV SPOOFING
   $('body').on('keydown', event => {
     const allowed = ['testuser', 'Nerotu']
@@ -1502,7 +1682,10 @@ window.onTelegramAuth = async (data) => {
 
     if (feature) {
       const prop = feature.getProperties()
-      feature.getStyle()[0] = FeatureStyles.POINT(ol.proj.fromLonLat(json.c), json.te, eng / eng_total, prop.highlight)
+      const style = feature.getStyle()
+      const pos = ol.proj.fromLonLat(json.c)
+      style[0] = FeatureStyles.POINT(pos, json.te, eng / eng_total)
+      style[1] = FeatureStyles.LIGHT(pos, JSON.parse(localStorage.getItem('map-config'))?.h ?? 0, prop.highlight)
       feature.changed()
     }
 
@@ -1513,9 +1696,10 @@ window.onTelegramAuth = async (data) => {
     $('#i-title').text(json.t)
     $('#i-image').css('background-image', `url('${getPointImage(json.i)}')`)
     $('#i-level').text(i18next.t('info.level', { count: json.l })).css('color', `var(--level-${json.l})`)
-    $('#i-ref').text(i18next.t('info.refs', { count: ref?.a || 0 })).attr('data-has', ref ? 1 : 0)
+    $('#i-ref').text(i18next.t('info.refs', { count: ref?.a || 0, max: REF_LIMIT })).attr('data-has', ref ? 1 : 0)
     $('#i-stat__distance').text(distanceToString(getDistance(json.c)))
     $('#i-stat__owner').text(json.o || i18next.t('info.na')).css('color', team_color).attr('data-name', json.o)
+    document.querySelector('#i-stat__bearing').style.transform = `rotate(${Math.round(getBearing(json.c))}deg)`
     ;(() => {
       const flag = json.o === self_data.n
       const target = document.querySelector('#i-stat__guard')
@@ -1585,27 +1769,25 @@ window.onTelegramAuth = async (data) => {
         $('#deploy').attr('data-state', 'deploy').text(i18next.t('buttons.deploy'))
         target.removeClass('selected')
         manageDeploy()
+        adjustDeploymentSlider()
         return
       }
       $('.i-stat__core').removeClass('selected')
       target.addClass('selected')
       $('#deploy').attr('data-state', 'upgrade').text(i18next.t('buttons.upgrade'))
+      adjustDeploymentSlider()
       manageDeploy()
     })
-    manageControls()
 
-    const active = document.querySelector('#cores-list .is-active')?.getAttribute('data-guid')
-    let new_index = 0
     $('#cores-list').empty()
     inventory.filter(f => f.t == 1).sort((a, b) => a.l - b.l).forEach((e, n) => {
       $('#cores-list').append($('<li>', { class: 'splide__slide', 'data-guid': e.g, 'data-level': e.l })
         .append($('<span>', { class: 'cores-list__level', text: i18next.t('items.core-short', { level: romanize(e.l) }) }).css('color', `var(--level-${e.l})`))
         .append($('<span>', { class: 'cores-list__amount', text: i18next.t('items.amount', { count: e.a }) }))
       )
-      if (e.g === active) new_index = n
     })
     deploy_slider.refresh()
-    deploy_slider.go(new_index)
+    adjustDeploymentSlider()
     manageDeploy()
 
     ;(function prepareRing() {
@@ -1620,13 +1802,33 @@ window.onTelegramAuth = async (data) => {
       ring.children.item(0).setAttribute('d', `M ${w / 2},0 H ${w} V ${h} H 0 V 0 Z`)
     })()
     const exists = showCooldownTimer(json.g)
-    if (!exists) $('#discover').removeAttr('data-time').removeClass('locked')
+    if (!exists) {
+      $('#discover').removeAttr('data-time')
+      document.querySelector('.discover').classList.remove('locked')
+    }
 
-    clearInterval(timers.info_controls)
-    timers.info_controls = setInterval(() => {
-      manageControls()
-      $('#i-stat__distance').text(distanceToString(getDistance(json.c)))
-    }, 100)
+    manageControls()
+
+    const draw_counter = document.querySelector('#draw-count')
+    if (!draw_counter.textContent.match(/^\[\d+\]$/)) {
+      point_state.possible_lines = []
+      request_controllers.draw.abort('0x00')
+      request_controllers.draw = new AbortController()
+      draw_counter.textContent = '[...]'
+      apiQuery('draw', {
+        guid: json.g,
+        position: ol.proj.toLonLat(player_feature.getGeometry().getCoordinates()),
+        exref: JSON.parse(localStorage.getItem('settings'))?.exref,
+        lite: 1
+      }, [$('.info')[0], 'top right'])
+      .then(({ response }) => {
+        point_state.possible_lines = response.data
+        draw_counter.textContent = `[${response.data.length}]`
+      })
+      .catch(() => {
+        draw_counter.textContent = '[N/A]'
+      })
+    }
   }
   function getPointImage(data) {
     if (data === null)
@@ -1651,7 +1853,7 @@ window.onTelegramAuth = async (data) => {
     const pos = ol.proj.fromLonLat(coords)
     player_feature.getGeometry().setCoordinates(pos)
     player_styles.slice(1, 3).forEach(e => e.getGeometry().setCenter(pos))
-    manageDeploy()
+    document.querySelector('.info').dispatchEvent(new PlayerMoveEvent(coords))
 
     ;(function() {
       const follow = localStorage.getItem('follow') === 'true'
@@ -1663,7 +1865,7 @@ window.onTelegramAuth = async (data) => {
   function manageControls() {
     const inventory = JSON.parse(localStorage.getItem('inventory-cache')) || []
     const in_range = isInRange(point_state.info.c)
-    $('#discover:not(.locked)').prop('disabled', !in_range)
+    $('.discover:not(.locked) > button').prop('disabled', !in_range)
     $('#repair:not(.locked)').prop('disabled', !((in_range || (!in_range && inventory.find(f => f.l === point_state.info.g))) && point_state.info.te == self_data.t && point_state.info.co.some(s => s.e < Cores[s.l].eng)))
     const outbound = point_state.info.li?.o || 0
     $('#draw:not(.locked)').prop('disabled', !(in_range && point_state.info.te == self_data.t && point_state.info.co.length >= 6 && outbound < LINES_LIMIT_OUT))
@@ -1671,10 +1873,11 @@ window.onTelegramAuth = async (data) => {
   function manageDeploy() {
     if ($('.info').hasClass('hidden')) return
     const inventory = JSON.parse(localStorage.getItem('inventory-cache')) || []
-    const core = inventory.find(f => f.g == $('#cores-list li').eq(deploy_slider.index).attr('data-guid'))
-    const limit = Cores[core?.l]?.lim || 0
+    const level = +document.querySelector('#cores-list').children.item(deploy_slider.index).getAttribute('data-level')
+    const limit = Cores[level]?.lim || 0
     const state = $('#deploy').attr('data-state')
-    const errors = ['', i18next.t('popups.no-cores'),
+    const errors = ['',
+      i18next.t('popups.no-cores'),
       i18next.t('popups.point.enemy'),
       i18next.t('popups.point.range'),
       i18next.t('popups.point.full-deploy'),
@@ -1684,13 +1887,19 @@ window.onTelegramAuth = async (data) => {
     ]
     let error = 0
     const info = point_state.info
-    if (inventory.filter(f => f.t == 1).length == 0) error = 1
+    if (inventory.filter(f => f.t === 1).length === 0) error = 1
     else if (info.te != 0 && info.te != self_data.t) error = 2
     else if (info.c.length && !isInRange(info.c)) error = 3
-    else if (info.co.length == 6 && state == 'deploy') error = 4
-    else if (core.l > self_data.l) error = 5
-    else if (info.co.find(f => f.g == $('.i-stat__core.selected').attr('data-guid'))?.l >= core.l) error = 6
-    else if (info.co.filter(f => f.o == self_data.n && f.l == core.l).length >= limit) error = 7
+    else if (info.co.length === 6 && state === 'deploy') error = 4
+    else if (level > self_data.l) error = 5
+    else if (info.co.find(f => f.g === $('.i-stat__core.selected').attr('data-guid'))?.l >= level) {
+      error = 6
+      if (adjustDeploymentSlider()) error = 0
+    }
+    else if (info.co.filter(f => f.o === self_data.n && f.l === level).length >= limit && limit > 0) {
+      error = 7
+      if (adjustDeploymentSlider()) error = 0
+    }
 
     if (error == 1) $('#deploy-slider').addClass('hidden')
     else if ($('#deploy-slider').hasClass('hidden')) $('#deploy-slider').removeClass('hidden')
@@ -1698,6 +1907,90 @@ window.onTelegramAuth = async (data) => {
     $('#deploy:not(.locked)').prop('disabled', Boolean(error))
     $('.deploy-slider-error').text(errors[error])
     .css('color', error ? '#F00' : '#0000')
+  }
+  Array.prototype.findLastIndex = function(predicate) {
+    for (let index = this.length - 1; index >= 0; index--) {
+      if (predicate(this[index], index, this))
+        return index
+    }
+    return -1
+  }
+  function adjustDeploymentSlider() {
+    if (!document.querySelector('#magic-deploy').checked) return false
+
+    const info = point_state.info
+    if (info.te !== 0 && info.te !== self_data.t) return false
+
+    const self_cores = info.co.filter(f => f.o === self_data.n).reduce((acc, e) => (acc[e.l] = (acc[e.l] ?? 0) + 1, acc), {})
+    const state = document.querySelector('#deploy').getAttribute('data-state')
+    const children = Array.from(document.querySelector('#cores-list').children)
+
+    let index = -1
+    if (state === 'deploy' && info.co.length < 6) {
+      const strat = getSettings('strtdl')
+      const predicate = f => {
+        const level = f.getAttribute('data-level')
+        return level <= self_data.l && (self_cores[level] || 0) < (Cores[level]?.lim || 0)
+      }
+      switch (strat) {
+        default:
+        case 'high': index = children.findLastIndex(predicate); break
+        case 'low':  index = children.findIndex(predicate); break
+      }
+    } else if (state === 'upgrade') {
+      const slot = document.querySelector('.i-stat__core.selected').getAttribute('data-guid')
+      const core = info.co.find(f => f.g === slot)
+      if (typeof core === 'undefined') return false
+
+      const strat = getSettings('strtup')
+      const predicate = f => {
+        const level = f.getAttribute('data-level')
+        return level > core.l && level <= self_data.l && (self_cores[level] || 0) < (Cores[level]?.lim || 0)
+      }
+      switch (strat) {
+        default:
+        case 'low':  index = children.findIndex(predicate); break
+        case 'high': index = children.findLastIndex(predicate); break
+      }
+      if (index === -1) {
+        const strat = getSettings('strtuo')
+        const level = (function() {
+          switch (strat) {
+            default:
+            case 'low':  return info.co.reduce((r, e) =>
+              e.l < r && e.g !== core.g && e.l < self_data.l && (self_cores[e.l] || 0) < (Cores[e.l]?.lim || 0) ? r = e.l : r,
+              Infinity
+            )
+            case 'high': return info.co.reduce((r, e) =>
+              e.l > r && e.g !== core.g && e.l < self_data.l && (self_cores[e.l] || 0) < (Cores[e.l]?.lim || 0) ? r = e.l : r,
+              -Infinity
+            )
+          }
+        })()
+        if (isFinite(level)) {
+          // проверяем, можно ли заапгрейдить предложенный минимальный/максимальный уровень
+          // это делается просто: смотрим лимиты у коров не ниже, чем предложенный
+          let upgradable = false
+          for (let test_level = level + 1; test_level <= Math.min(Cores.length - 1, self_data.l); test_level++) {
+            if (self_cores[test_level] >= Cores[test_level]?.lim) continue
+            upgradable = true
+            break
+          }
+
+          if (upgradable) {
+            const next = info.co.find(f => f.g !== slot && f.l === level)
+            const slots = Array.from(document.querySelectorAll('.i-stat__core[data-guid]'))
+            slots.forEach(e => e.classList.remove('selected'))
+            slots.find(f => f.getAttribute('data-guid') === next.g).classList.add('selected')
+            adjustDeploymentSlider()
+          }
+        }
+      }
+    }
+
+    if (index === -1) return false
+    deploy_slider.go(index)
+    return true
   }
   function showCooldownTimer(guid) {
     const ring = document.querySelector('.discovery-ring')
@@ -1714,8 +2007,9 @@ window.onTelegramAuth = async (data) => {
       const diff = Math.round((cooldowns[guid].t - Date.now()) / 1000)
       const prm = +ring.style.getPropertyValue('--prm')
       if (diff > 0) {
+        document.querySelector('.discover').classList.add('locked')
+        document.querySelectorAll('.discover > button').forEach(e => e.setAttribute('disabled', ''))
         $('#discover').attr('data-time', timeToString(diff))
-        .addClass('locked').prop('disabled', true)
         let max = COOLDOWN
         if (cooldowns[guid].c > 0) $('#discover').attr('data-remain', cooldowns[guid].c)
         else {
@@ -1724,12 +2018,12 @@ window.onTelegramAuth = async (data) => {
         }
         ring.style.setProperty('--off', Math.min((max - diff + 1) / max * prm, prm))
       } else {
-        $('#discover').removeAttr('data-time')
-        .removeAttr('data-remain')
-        .removeClass('locked')
+        document.querySelector('.discover').classList.remove('locked')
+        $('#discover').removeAttr('data-time').removeAttr('data-remain')
         delete cooldowns[guid]
         localStorage.setItem('cooldowns', JSON.stringify(cooldowns))
         clearInterval(timers.info_cooldown)
+        manageControls()
       }
     }
   }
@@ -1761,6 +2055,7 @@ window.onTelegramAuth = async (data) => {
     view.setProperties({ offset: [0, ViewOffsets.NORMAL] })
     view.setCenter(player_feature.getGeometry().getCoordinates())
     // view.adjustCenter(view.getProperties().offset)
+    document.querySelector('#attack-menu').removeAttribute('disabled')
   }
   function showExpDiff(diff) {
     if (diff == 0) return
@@ -1824,6 +2119,8 @@ window.onTelegramAuth = async (data) => {
       const total = inventory.reduce(((acc, e) => acc += G2T[category].includes(e.t) ? e.a : 0), 0)
       $(tab).find('.inventory__tab-counter').text(total)
     })
+    $('#inventory-sort').prop('disabled', tab != 3)
+    initRefsView()
   }
   function createInventoryItem(data) {
     function manageItem() {
@@ -1852,9 +2149,15 @@ window.onTelegramAuth = async (data) => {
     container.attr('data-guid', data.g)
     if (data.t == 3) {
       const controls = $('<div>', { class: 'inventory__item-controls' })
-        // .append($('<button>', { class: 'inventory__ic-repair', text: 'R' }).prop('disabled', true))
-        .append($('<button>', { class: 'inventory__ic-manage', text: i18next.t('buttons.references.manage') }).on('click', manageItem))
-        .append($('<button>', { class: 'inventory__ic-view', text: i18next.t('buttons.references.view') }).prop('disabled', true))
+        .append($('<button>', { class: 'inventory__ic-manage', html: '<svg viewBox="0 0 512 512" height="1em"><use href="#fas-trash-can"></use></svg>' }).on('click', manageItem))
+        .append($('<button>', { class: 'inventory__ic-view', html: '<svg viewBox="0 0 597 512" height="1em"><use href="#fas-eye"></use></svg>' }).on('click', () => {
+          if ($('#inventory-delete').attr('data-del') != 0) return
+          document.querySelector('#toggle-follow').checked = false
+          localStorage.setItem('follow', false)
+          view.setCenter(ol.proj.fromLonLat(data.c))
+          $('.inventory').addClass('hidden')
+        }))
+        .append($('<button>', { class: 'inventory__ic-repair', html: '<svg viewBox="0 0 512 512" height="2em"><use href="#fas-wrench"></use></svg>' }).prop('disabled', true))
       descr.css('font-style', 'italic').text(i18next.t('inventory.reference.default'))
       container.attr('data-ref', data.l)
         .append($('<div>', { class: 'inventory__item-left' }).append(title).append(descr))
@@ -1869,63 +2172,121 @@ window.onTelegramAuth = async (data) => {
   }
   function getRefsData(target) {
     const { scrollTop, clientHeight } = target
-    $('.inventory__item').each(async (_, e) => {
-      if (!$(e).attr('data-ref')) return
-      if (!(e.offsetTop <= scrollTop + clientHeight && e.offsetTop >= scrollTop && !$(e).hasClass('loaded') && !$(e).hasClass('loading'))) return
-      const guid = $(e).attr('data-ref')
-      const cache = JSON.parse(localStorage.getItem('refs-cache')) || {}
-      const pos = (JSON.parse(localStorage.getItem('inventory-cache')) || []).find(f => f.l == guid && f.t == 3).c
 
-      $(e).addClass('loading')
-      if (typeof cache[guid] !== 'undefined') {
-        cache[guid].c = pos
-        makeEntry(e, cache[guid])
-      }
-      const { response } = await apiQuery('point', {
-        guid: $(e).attr('data-ref'),
-        status: 1
-      }).catch(err => {
-        const target = $(e).find('.inventory__item-descr')
-        target.text(i18next.t('inventory.reference.failed', { reason: err.error }))
-        $(e).removeClass('loading').addClass('loaded')
-        return { response: null }
+    const view = JSON.parse(localStorage.getItem('refs-view'))
+    view.scroll = scrollTop
+    localStorage.setItem('refs-view', JSON.stringify(view))
+
+    clearTimeout(timers.refs_data)
+    timers.refs_data = setTimeout(() => {
+      $('.inventory__item').each(async (_, e) => {
+        if (!$(e).attr('data-ref')) return
+        if (!(
+          e.offsetTop <= scrollTop + clientHeight &&
+          e.offsetTop >= scrollTop &&
+          !e.className.match(/\b(?:loaded|loading|hidden)\b/)
+        )) return
+        const guid = $(e).attr('data-ref')
+        const cache = JSON.parse(localStorage.getItem('refs-cache')) || {}
+        const pos = (JSON.parse(localStorage.getItem('inventory-cache')) || []).find(f => f.l == guid && f.t == 3).c
+
+        $(e).addClass('loading')
+        if (typeof cache[guid] !== 'undefined') {
+          cache[guid].c = pos
+          makeEntry(e, cache[guid])
+        }
+        const { response } = await apiQuery('point', {
+          guid: $(e).attr('data-ref'),
+          status: 1
+        }).catch(err => {
+          const target = $(e).find('.inventory__item-descr')
+          target.text(i18next.t('inventory.reference.failed', { reason: err.error }))
+          $(e).removeClass('loading').addClass('loaded')
+          return { response: null }
+        })
+        if (!response) return
+        const data = response.data
+        cache[guid] = {
+          te: data.te, co: data.co,
+          e: data.e, l: data.l,
+          o: data.o,
+          t: Date.now() + 5 * 60e3
+        }
+        localStorage.setItem('refs-cache', JSON.stringify(cache))
+        makeEntry(e, data)
       })
-      if (!response) return
-      const data = response.data
-      cache[guid] = {
-        te: data.te, co: data.co,
-        e: data.e, l: data.l,
-        o: data.o,
-        t: Date.now() + 5 * 60e3
-      }
-      localStorage.setItem('refs-cache', JSON.stringify(cache))
-      makeEntry(e, data)
-    })
+    }, 500)
 
     function makeEntry(e, data) {
-      $(e).find('.inventory__ic-view').prop('disabled', false).on('click', () => {
-        if ($('#inventory-delete').attr('data-del') != 0) return
-        $('#toggle-follow').attr('data-active', false)
-        localStorage.setItem('follow', false)
-        view.setCenter(ol.proj.fromLonLat(data.c))
-        $('.inventory').addClass('hidden')
-      })
-      $(e).find('.inventory__item-title').css('color', `var(--team-${data.te})`)
+      $(e).find('.inventory__item-title').css('color', `var(--team-${data.te ?? 0})`)
       const target = $(e).find('.inventory__item-descr')
       const message = 'inventory.reference.info' + (data.o === self_data.n ? '-guard' : '')
+      const formatter = new Intl.NumberFormat(LANG, { maximumFractionDigits: 1 })
       const entry = jquerypassargs(
         $('<div>', { class: 'inventory__item-descr' }),
         i18next.t(message, { owner: data.o ? i18next.t('inventory.reference.owner') : i18next.t('inventory.reference.owner-none') }),
         $('<span>').text(i18next.t('inventory.reference.level', { count: data.l })).css('color', `var(--level-${data.l})`),
         $('<span>', { class: 'profile-link' }).text(data.o).css('color', `var(--team-${data.te})`).attr('data-name', data.o).on('click', openProfile),
-        new Intl.NumberFormat(LANG, { maximumFractionDigits: 1 }).format(data.e),
-        data.co,
+        $('<span>', { class: 'iid-energy' }).text(formatter.format(data.e)),
+        $('<span>', { class: 'iid-count' }).text(data.co),
         distanceToString(getDistance(data.c)),
         i18next.t('inventory.reference.guard', { count: data.gu ?? -1 })
       )
       target.replaceWith(entry)
       $(e).removeClass('loading').addClass('loaded')
+      const repair = e.querySelector('.inventory__ic-repair')
+      if (data.te === self_data.t && data.co > 0 && data.e < 100)
+        repair.removeAttribute('disabled')
+      else repair.setAttribute('disabled', '')
+      repair.onclick = async function() {
+        this.classList.add('locked')
+        this.setAttribute('disabled', '')
+        const guid = data.g
+        const { response } = await apiSend('repair', 'post', {
+          guid,
+          position: ol.proj.toLonLat(player_feature.getGeometry().getCoordinates())
+        }, [document.querySelector('.inventory'), 'bottom left']).catch(({ toast }) => apiCatch(toast, true))
+        this.classList.remove('locked')
+        this.removeAttribute('disabled')
+        if (!response) return
+
+        handleExpChange(response.xp)
+
+        let eng = 0
+        let eng_total = 0
+        response.data.reduce((_, e) => (eng += e.e, eng_total += Cores[e.l]?.eng))
+        e.querySelector('.iid-energy').textContent = formatter.format(eng / eng_total * 100)
+        e.querySelector('.iid-count').textContent = response.data.length
+        if (response.data.length === 0 || eng / eng_total >= 1)
+          this.setAttribute('disabled', '')
+
+        const feature = points_source.getFeatureById(guid)
+        if (feature) {
+          const prop = feature.getProperties()
+          const style = feature.getStyle()
+          const pos = ol.proj.fromLonLat(response.c)
+          style[0] = FeatureStyles.POINT(pos, response.te, eng / eng_total)
+          style[1] = FeatureStyles.LIGHT(pos, JSON.parse(localStorage.getItem('map-config'))?.h ?? 0, prop.highlight)
+          feature.changed()
+        }
+      }
     }
+  }
+  function arrangeInventoryRefs(order) {
+    const wrp = document.querySelector('.inventory__content')
+    if (wrp.getAttribute('data-tab') != 3) return
+
+    Array.from(wrp.children).forEach(e => e.classList.add('hidden'))
+    wrp.scroll({ top: 1 })
+    for (const guid of order) {
+      const element = wrp.querySelector(`[data-guid="${guid}"]`)
+      if (element === null) continue
+
+      element.classList.remove('hidden')
+      wrp.append(element)
+    }
+    wrp.scroll({ top: 0 })
+    getRefsData(wrp)
   }
   async function deleteInventoryItem(parent) {
     const valid = parent.find('.inventory__ma-amount')[0].reportValidity()
@@ -1937,7 +2298,7 @@ window.onTelegramAuth = async (data) => {
     const tab = +parent.attr('data-tab')
 
     const inventory = JSON.parse(localStorage.getItem('inventory-cache')) || []
-    if (USABLE.includes(inventory.find(f => f.g === guid)?.l)) {
+    if (USABLE.includes(inventory.find(f => f.g === guid)?.t)) {
       const proof = confirm(i18next.t('inventory.premium-warning'))
       if (!proof) {
         button.prop('disabled', false)
@@ -1978,8 +2339,14 @@ window.onTelegramAuth = async (data) => {
     $(`.inventory__tab[data-tab="${tab}"] .inventory__tab-counter`).text(response.count[tab])
     $('#self-info__inv').text(response.count.total)
       .parent().css('color', response.count.total >= INVENTORY_LIMIT ? 'var(--accent)' : '')
-    if (tab == 3) $('#i-ref').text(i18next.t('info.refs', { count: response.count.item })).attr('data-has', +(response.count.item > 0))
+    if (tab == 3) $('#i-ref').text(i18next.t('info.refs', { count: response.count.item, max: REF_LIMIT })).attr('data-has', +(response.count.item > 0))
     return true
+  }
+  function initRefsView() {
+    if (localStorage.getItem('refs-view')) return
+    const data = { scroll: 0, q: 0, o: 1, t: 0b1111 }
+    localStorage.setItem('refs-view', JSON.stringify(data))
+    return data
   }
 
   async function openProfile(data) {
@@ -1996,6 +2363,8 @@ window.onTelegramAuth = async (data) => {
     else return
     if (name == 'n/a') return
 
+    request_controllers.profile.abort('0x00')
+    request_controllers.profile = new AbortController()
     const { response } = await apiQuery('profile', { name }).catch(({ toast }) => apiCatch(toast))
     if (!response) return
 
@@ -2171,7 +2540,8 @@ window.onTelegramAuth = async (data) => {
       [/^cores_/, 'crs'],
       [/lines?/, 'lns'],
       [/regions/, 'rgs'],
-      [/days/, 'dys']
+      [/days/, 'dys'],
+      [/^brooms_/, 'pcs'],
     ]
 
     $('#leaderboard, .ld-navi, #ld-page').prop('disabled', true)
@@ -2268,24 +2638,32 @@ window.onTelegramAuth = async (data) => {
     regions_source.clear(true)
     const zoom = view.getZoom()
     let npoints
-    if (zoom > 10) npoints = 5
-    else if (7 < zoom && zoom <= 10) npoints = 25
-    else if (zoom <= 7) npoints = 50
+    const highlight = JSON.parse(localStorage.getItem('map-config'))?.h ?? 0
     source.p.forEach(e => {
       const mpos = ol.proj.fromLonLat(e.c)
       const feature = new ol.Feature({
         geometry: new ol.geom.Point(mpos)
       })
       feature.setId(e.g)
-      feature.setStyle([FeatureStyles.POINT(mpos, e.t, e.e, e.h)])
+      feature.setStyle([FeatureStyles.POINT(mpos, e.t, e.e), FeatureStyles.LIGHT(mpos, highlight, e.h)])
       feature.setProperties({
         team: e.t,
+        cores: e.co,
         energy: e.e,
         highlight: e.h
       })
       points_source.addFeature(feature)
     })
+    const [SEGMENT, NPCAP] = (function() {
+      if (zoom <= 6) return [500, 30]
+      if (zoom <= 9) return [100, 75]
+      if (zoom <= 12) return [75, 110]
+      return [35, 150]
+    })()
     source.l.forEach(e => {
+      const ls = turf.lineString(e.c)
+      const len = turf.length(ls)
+      npoints = Math.min(Math.ceil(len / SEGMENT), NPCAP)
       const arc = turf.greatCircle(...e.c, { npoints })
       arc.geometry.coordinates = arc.geometry.coordinates.map(m => ol.proj.fromLonLat(m))
       const format = new ol.format.GeoJSON()
@@ -2299,8 +2677,13 @@ window.onTelegramAuth = async (data) => {
     })
     source.r.forEach(e => {
       const ts = []
-      for (let i = 1; i <= 3; i++)
-        ts.push(turf.greatCircle(e.c[0][i - 1], e.c[0][i], { npoints }).geometry.coordinates)
+      for (let i = 1; i <= 3; i++) {
+        const pos = e.c[0].slice(i - 1, i + 1)
+        const ls = turf.lineString(pos)
+        const len = turf.length(ls)
+        npoints = Math.min(Math.ceil(len / SEGMENT), NPCAP)
+        ts.push(turf.greatCircle(...pos, { npoints }).geometry.coordinates)
+      }
       const n = ts.flat().map(m => ol.proj.fromLonLat(m))
       n[n.length - 1] = n[0]
 
@@ -2351,6 +2734,15 @@ window.onTelegramAuth = async (data) => {
     if (distance < 1) return i18next.t('units.cm', { count: distance * 100 })
     else if (distance < 1000) return i18next.t('units.m', { count: distance })
     else return i18next.t('units.km', { count: distance / 1000 })
+  }
+  function getBearing(to, from = player_feature.getGeometry().getCoordinates()) {
+    return turf.bearing(ol.proj.toLonLat(from), to)
+  }
+  function getRhumb(a) {
+    const abs = Math.abs(a % 180)
+    const dir = a < 0 ? i18next.t('info.bearing.west') : i18next.t('info.bearing.east')
+    const rhi = RHA.findIndex(f => abs <= f)
+    return RHN[rhi].replace(/\./g, dir)
   }
   function areaToString(area) {
     if (area < 1) return i18next.t('units.sqm', { count: area * 1e6 })
@@ -2432,7 +2824,10 @@ window.onTelegramAuth = async (data) => {
         arabic: false, selfpos: false,
         exref: false, base: 'cdb',
         plrhid: false, opacity: 2,
-        efmode: 'full',
+        efmode: 'full', atkord: false,
+        strtdl: 'high', strtup: 'low',
+        strtwp: 'high', lastwp: null,
+        strtuo: 'low',
       }))
     }
     const data = JSON.parse(localStorage.getItem('settings'))
@@ -2502,6 +2897,7 @@ window.onTelegramAuth = async (data) => {
       clearInterval(timers.score)
       $('.info .inventory__manage-amount').remove()
       if (map.getProperties().ignore_follow) map.setProperties({ ignore_follow: false })
+      document.querySelector('#draw-count').textContent = '[N/A]'
     }
   }
   function confirmOuter(event) {
@@ -2593,11 +2989,10 @@ window.onTelegramAuth = async (data) => {
   function apiQuery(endpoint, data = {}, toast_opts = [], exclude = []) {
     return new Promise(async (res, rej) => {
       const h_obj = {
-        authorization: `Bearer ${localStorage.getItem('auth')}`,
         'accept-language': LANG
       }
       exclude.forEach(e => delete h_obj[e])
-      const request = await fetch(makeURL(`/api/${endpoint}`, data), {
+      const request = await flavored_fetch(makeURL(`/api/${endpoint}`, data), {
         method: 'get',
         headers: h_obj,
         signal: getAbortSignal(endpoint)
@@ -2614,7 +3009,7 @@ window.onTelegramAuth = async (data) => {
         return
       }
       const response = await request.json()
-      const version = request.headers.get('SBG-Version')
+      const version = request.headers.get('x-sbg-version')
       if (VERSION && version !== VERSION) {
         const toast = createToast(i18next.t('popups.update', { version }), ...toast_opts)
         toast.options.className = 'error-toast'
@@ -2631,12 +3026,11 @@ window.onTelegramAuth = async (data) => {
   function apiSend(endpoint, method, data, toast_opts = [], exclude = []) {
     return new Promise(async (res, rej) => {
       const h_obj = {
-        authorization: `Bearer ${localStorage.getItem('auth')}`,
         'accept-language': LANG,
         'content-type': 'application/json'
       }
       exclude.forEach(e => delete h_obj[e])
-      const request = await fetch(`/api/${endpoint}`, {
+      const request = await flavored_fetch(`/api/${endpoint}`, {
         method,
         body: JSON.stringify(data),
         headers: h_obj
@@ -2652,7 +3046,7 @@ window.onTelegramAuth = async (data) => {
         return
       }
       const response = await request.json()
-      const version = request.headers.get('SBG-Version')
+      const version = request.headers.get('x-sbg-version')
       if (VERSION && version !== VERSION) {
         const toast = createToast(i18next.t('popups.update', { version }), ...toast_opts)
         toast.options.className = 'error-toast'
@@ -2675,19 +3069,25 @@ window.onTelegramAuth = async (data) => {
     switch (endpoint) {
       case 'inview': return request_controllers.entities.signal
       case 'point': return request_controllers.points.signal
+      case 'draw': return request_controllers.draw.signal
+      case 'profile': return request_controllers.profile.signal
       default: return null
     }
   }
   function makeURL(url, params) {
-    if (Object.keys(params).length == 0) return url
-    let query = []
+    const sp = new URLSearchParams()
+    if (!Object.keys(params).length) return url
+
     for (const key in params) {
-      if (params[key] instanceof Array)
-        params[key].forEach(e => query.push(`${encodeURIComponent(key)}[]=${encodeURIComponent(e)}`))
+      const value = params[key]
+      if (value instanceof Array)
+        value.forEach(e => sp.append(key + '[]', e))
+      else if (value instanceof Object)
+        sp.append(key, JSON.stringify(value))
       else
-        query.push(`${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        sp.append(key, value)
     }
-    return `${url}?${query.join('&')}`
+    return `${url}?${sp.toString()}`
   }
 
   function createToast(text = '', container = null, position = 'bottom center') {
@@ -2715,7 +3115,4 @@ window.onTelegramAuth = async (data) => {
     if (popup_toasts.length <= 3) return
     popup_toasts[0].hideToast()
   }
-
-  class Bitfield{#bits=[];constructor(...bits){bits.forEach(e=>this.#bits.push(Boolean(e)))};get(bit){return this.#bits[bit]??false};change(bit,state){this.#bits[bit]=Boolean(state);return this};forEach(callback){for(let i=0;i<this.#bits.length;i++)callback(this.get(i),i)};toString(radix=10){let sum=0;for(let i=0;i<this.#bits.length;i++)sum+=this.#bits[i]<<i;return sum.toString(radix)}}
-  Bitfield.from=function(number){const bf=new Bitfield();let i=0;while(number>=(1<<i)){bf.change(i,number&(1<<i));i++}return bf}
 })();
